@@ -178,6 +178,78 @@ class TestForecastHelperContract(unittest.TestCase):
         self.assertEqual(daily[0]["wind_gust_speed"], 9.0)
         self.assertEqual(daily[0]["cloud_coverage"], 45.0)
 
+    def test_forecast_summary_answers_practical_questions(self):
+        rows = forecast.parse_helper_forecast(
+            {
+                "model_run_time": "2026-06-03T00:00:00Z",
+                "source_url": "https://example.test/aladin.json",
+                "source_run_id": "run",
+                "rows": [
+                    {
+                        "valid_time": "2026-06-03T21:00:00Z",
+                        "temperature": 15,
+                        "wind_gust": 4,
+                        "cloud_cover": 90,
+                        "precipitation_amount": 0,
+                    },
+                    {
+                        "valid_time": "2026-06-04T03:00:00Z",
+                        "temperature": 11,
+                        "wind_gust": 8,
+                        "cloud_cover": 20,
+                        "precipitation_amount": 0,
+                    },
+                    {
+                        "valid_time": "2026-06-04T12:00:00Z",
+                        "temperature": 23,
+                        "wind_gust": 12,
+                        "cloud_cover": 80,
+                        "precipitation_amount": 1.4,
+                    },
+                    {
+                        "valid_time": "2026-06-05T00:00:00Z",
+                        "temperature": 17,
+                        "wind_gust": 6,
+                        "cloud_cover": 10,
+                        "precipitation_amount": 0,
+                    },
+                ],
+            }
+        )
+
+        summary = forecast.forecast_summary(
+            rows,
+            datetime(2026, 6, 3, 20, tzinfo=timezone.utc),
+        )
+
+        self.assertEqual(summary["tomorrow_min_temperature"], 11.0)
+        self.assertEqual(summary["tomorrow_max_temperature"], 23.0)
+        self.assertEqual(summary["next_precipitation_time"], datetime(2026, 6, 4, 12, tzinfo=timezone.utc))
+        self.assertEqual(summary["next_precipitation_amount"], 1.4)
+        self.assertEqual(summary["strongest_gust_time"], datetime(2026, 6, 4, 12, tzinfo=timezone.utc))
+        self.assertEqual(summary["strongest_gust_speed"], 12.0)
+        self.assertEqual(summary["next_clear_window_time"], datetime(2026, 6, 4, 3, tzinfo=timezone.utc))
+
+    def test_forecast_summary_returns_none_when_no_match_exists(self):
+        rows = forecast.parse_helper_forecast(
+            {
+                "model_run_time": "2026-06-03T00:00:00Z",
+                "source_url": "https://example.test/aladin.json",
+                "source_run_id": "run",
+                "rows": [{"valid_time": "2026-06-03T01:00:00Z", "temperature": 10}],
+            }
+        )
+
+        summary = forecast.forecast_summary(
+            rows,
+            datetime(2026, 6, 3, 20, tzinfo=timezone.utc),
+        )
+
+        self.assertIsNone(summary["tomorrow_min_temperature"])
+        self.assertIsNone(summary["next_precipitation_time"])
+        self.assertIsNone(summary["strongest_gust_speed"])
+        self.assertIsNone(summary["next_clear_window_time"])
+
 
 if __name__ == "__main__":
     unittest.main()

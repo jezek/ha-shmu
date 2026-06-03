@@ -3,8 +3,12 @@ from homeassistant.const import PERCENTAGE
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.helpers.entity import DeviceInfo
 from datetime import datetime, timedelta
-from .const import DOMAIN
+import logging
+from .const import CONF_FORECAST_CACHE_PATH, DOMAIN
+from .forecast import ForecastCache, forecast_summary
 from homeassistant.util.dt import now
+
+_LOGGER = logging.getLogger(__name__)
 
 
 class SHMUSensor(CoordinatorEntity, SensorEntity):
@@ -138,6 +142,51 @@ class SHMUMeteogramSensor(CoordinatorEntity, SensorEntity):
         meteo3, meteo10 = self._generate_meteogram_url()
         return {"meteogram_3d_url": meteo3, "meteogram_10d_url": meteo10}
 
+
+class SHMUForecastSummarySensor(CoordinatorEntity, SensorEntity):
+    """Compact forecast summary sensor backed by the helper/cache boundary."""
+
+    def __init__(
+        self,
+        coordinator,
+        cache_path: str,
+        summary_key: str,
+        name: str,
+        unit: str | None = None,
+        device_class: SensorDeviceClass | None = None,
+        icon: str | None = None,
+    ):
+        """Initialize the forecast summary sensor."""
+        super().__init__(coordinator)
+        self._cache = ForecastCache(cache_path)
+        self._summary_key = summary_key
+        self._attr_name = name
+        self._attr_unique_id = f"{DOMAIN}_{coordinator.config_entry.entry_id}_{summary_key}"
+        self._attr_native_unit_of_measurement = unit
+        self._attr_device_class = device_class
+        self._attr_icon = icon
+
+        station_id = coordinator.config_entry.data["station_id"]
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, coordinator.config_entry.entry_id)},
+            name=f"SHMU Station {station_id}",
+            manufacturer="Slovenský hydrometeorologický ústav",
+            model="Weather Station",
+            sw_version="1.0",
+        )
+
+    @property
+    def native_value(self):
+        """Return the selected forecast summary value."""
+        try:
+            rows = self._cache.load()
+        except FileNotFoundError:
+            return None
+        except ValueError as err:
+            _LOGGER.warning("Invalid SHMU forecast cache: %s", err)
+            return None
+        return forecast_summary(rows, now()).get(self._summary_key)
+
 async def async_setup_entry(hass, config_entry, async_add_entities):
     """Set up the SHMU sensors."""
     coordinator = hass.data[DOMAIN][config_entry.entry_id]["coordinator"]
@@ -227,5 +276,75 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
     # Only add the meteogram sensor if meteogram_id is not "none"
     if meteogram_id != "none":
         sensors.append(SHMUMeteogramSensor(coordinator, meteogram_id))
+
+    forecast_cache_path = coordinator.config_entry.data.get(CONF_FORECAST_CACHE_PATH)
+    if forecast_cache_path:
+        sensors.extend(
+            [
+                SHMUForecastSummarySensor(
+                    coordinator,
+                    forecast_cache_path,
+                    "tomorrow_min_temperature",
+                    "Tomorrow minimum temperature",
+                    "°C",
+                    SensorDeviceClass.TEMPERATURE,
+                    "mdi:thermometer-chevron-down",
+                ),
+                SHMUForecastSummarySensor(
+                    coordinator,
+                    forecast_cache_path,
+                    "tomorrow_max_temperature",
+                    "Tomorrow maximum temperature",
+                    "°C",
+                    SensorDeviceClass.TEMPERATURE,
+                    "mdi:thermometer-chevron-up",
+                ),
+                SHMUForecastSummarySensor(
+                    coordinator,
+                    forecast_cache_path,
+                    "next_precipitation_time",
+                    "Next precipitation time",
+                    None,
+                    SensorDeviceClass.TIMESTAMP,
+                    "mdi:weather-rainy",
+                ),
+                SHMUForecastSummarySensor(
+                    coordinator,
+                    forecast_cache_path,
+                    "next_precipitation_amount",
+                    "Next precipitation amount",
+                    "mm",
+                    None,
+                    "mdi:cup-water",
+                ),
+                SHMUForecastSummarySensor(
+                    coordinator,
+                    forecast_cache_path,
+                    "strongest_gust_time",
+                    "Strongest gust time",
+                    None,
+                    SensorDeviceClass.TIMESTAMP,
+                    "mdi:weather-windy",
+                ),
+                SHMUForecastSummarySensor(
+                    coordinator,
+                    forecast_cache_path,
+                    "strongest_gust_speed",
+                    "Strongest gust speed",
+                    "m/s",
+                    SensorDeviceClass.WIND_SPEED,
+                    "mdi:weather-windy",
+                ),
+                SHMUForecastSummarySensor(
+                    coordinator,
+                    forecast_cache_path,
+                    "next_clear_window_time",
+                    "Next clear window time",
+                    None,
+                    SensorDeviceClass.TIMESTAMP,
+                    "mdi:weather-sunny",
+                ),
+            ]
+        )
 
     async_add_entities(sensors)

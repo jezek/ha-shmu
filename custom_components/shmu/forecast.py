@@ -14,6 +14,9 @@ from pathlib import Path
 import tempfile
 from typing import Any
 
+PRECIPITATION_THRESHOLD_MM = 0.1
+CLEAR_CLOUD_COVER_THRESHOLD = 30.0
+
 
 @dataclass(frozen=True)
 class ForecastRow:
@@ -166,6 +169,54 @@ def rows_as_daily_forecast(rows: list[ForecastRow]) -> list[dict[str, Any]]:
     return forecasts
 
 
+def forecast_summary(rows: list[ForecastRow], now: datetime) -> dict[str, Any]:
+    """Return compact forecast summary values for practical sensors."""
+    now_utc = _as_aware_utc(now)
+    future_rows = [row for row in rows if row.valid_time >= now_utc]
+    local_tz = now.tzinfo or timezone.utc
+    tomorrow = now_utc.astimezone(local_tz).date().toordinal() + 1
+    tomorrow_rows = [
+        row
+        for row in future_rows
+        if row.valid_time.astimezone(local_tz).date().toordinal() == tomorrow
+    ]
+    tomorrow_temperatures = [
+        row.temperature for row in tomorrow_rows if row.temperature is not None
+    ]
+
+    precipitation_rows = [
+        row
+        for row in future_rows
+        if row.precipitation_amount is not None
+        and row.precipitation_amount >= PRECIPITATION_THRESHOLD_MM
+    ]
+    next_precipitation = min(precipitation_rows, key=lambda row: row.valid_time, default=None)
+
+    gust_rows = [row for row in future_rows if row.wind_gust is not None]
+    strongest_gust = max(gust_rows, key=lambda row: row.wind_gust or 0, default=None)
+
+    clear_rows = [
+        row
+        for row in future_rows
+        if row.cloud_cover is not None
+        and row.cloud_cover <= CLEAR_CLOUD_COVER_THRESHOLD
+        and (row.precipitation_amount is None or row.precipitation_amount < PRECIPITATION_THRESHOLD_MM)
+    ]
+    next_clear = min(clear_rows, key=lambda row: row.valid_time, default=None)
+
+    return {
+        "tomorrow_min_temperature": min(tomorrow_temperatures) if tomorrow_temperatures else None,
+        "tomorrow_max_temperature": max(tomorrow_temperatures) if tomorrow_temperatures else None,
+        "next_precipitation_time": next_precipitation.valid_time if next_precipitation else None,
+        "next_precipitation_amount": (
+            next_precipitation.precipitation_amount if next_precipitation else None
+        ),
+        "strongest_gust_time": strongest_gust.valid_time if strongest_gust else None,
+        "strongest_gust_speed": strongest_gust.wind_gust if strongest_gust else None,
+        "next_clear_window_time": next_clear.valid_time if next_clear else None,
+    }
+
+
 def _parse_row(
     item: dict[str, Any],
     *,
@@ -269,3 +320,9 @@ def _parse_datetime(value: Any) -> datetime:
 
 def _format_datetime(value: datetime) -> str:
     return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def _as_aware_utc(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
