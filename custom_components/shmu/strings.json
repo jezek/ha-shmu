@@ -16,6 +16,10 @@
       "verify_ssl": {
         "name": "Overovať SSL certifikáty",
         "description": "Zapnite, ak chcete overovať SSL certifikáty (odporúčané)."
+      },
+      "forecast_cache_path": {
+        "name": "Cesta k forecast cache",
+        "description": "Voliteľná cesta k JSON cache súboru vytvorenému SHMU forecast helperom."
       }
     },
     "en": {
@@ -30,6 +34,10 @@
       "verify_ssl": {
         "name": "Verify SSL Certificates",
         "description": "Enable to verify SSL certificates (recommended)."
+      },
+      "forecast_cache_path": {
+        "name": "Forecast cache path",
+        "description": "Optional path to the JSON cache file produced by the SHMU forecast helper."
       }
     }
   }

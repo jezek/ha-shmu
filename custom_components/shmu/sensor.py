@@ -277,7 +277,10 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
     if meteogram_id != "none":
         sensors.append(SHMUMeteogramSensor(coordinator, meteogram_id))
 
-    forecast_cache_path = coordinator.config_entry.data.get(CONF_FORECAST_CACHE_PATH)
+    forecast_cache_path = coordinator.config_entry.options.get(
+        CONF_FORECAST_CACHE_PATH,
+        coordinator.config_entry.data.get(CONF_FORECAST_CACHE_PATH),
+    )
     if forecast_cache_path:
         sensors.extend(
             [

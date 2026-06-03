@@ -99,5 +99,8 @@ class SHMUWeather(CoordinatorEntity, WeatherEntity):
 async def async_setup_entry(hass, config_entry, async_add_entities):
     """Set up the SHMU weather entity."""
     coordinator = hass.data[DOMAIN][config_entry.entry_id]["coordinator"]
-    cache_path = config_entry.data.get(CONF_FORECAST_CACHE_PATH)
+    cache_path = config_entry.options.get(
+        CONF_FORECAST_CACHE_PATH,
+        config_entry.data.get(CONF_FORECAST_CACHE_PATH),
+    )
     async_add_entities([SHMUWeather(coordinator, cache_path)])
