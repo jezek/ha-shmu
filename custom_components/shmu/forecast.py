@@ -125,6 +125,47 @@ class ForecastCache:
         temp_path.replace(self._path)
 
 
+def rows_as_hourly_forecast(rows: list[ForecastRow]) -> list[dict[str, Any]]:
+    """Convert normalized rows into Home Assistant-style hourly forecast dicts."""
+    return [_row_as_weather_forecast(row) for row in sorted(rows, key=lambda row: row.valid_time)]
+
+
+def rows_as_daily_forecast(rows: list[ForecastRow]) -> list[dict[str, Any]]:
+    """Aggregate normalized rows into Home Assistant-style daily forecast dicts."""
+    days: dict[str, list[ForecastRow]] = {}
+    for row in sorted(rows, key=lambda row: row.valid_time):
+        day_key = row.valid_time.date().isoformat()
+        days.setdefault(day_key, []).append(row)
+
+    forecasts: list[dict[str, Any]] = []
+    for day_key, day_rows in days.items():
+        temperatures = [row.temperature for row in day_rows if row.temperature is not None]
+        precipitation = [
+            row.precipitation_amount
+            for row in day_rows
+            if row.precipitation_amount is not None
+        ]
+        wind_speeds = [row.wind_speed for row in day_rows if row.wind_speed is not None]
+        gusts = [row.wind_gust for row in day_rows if row.wind_gust is not None]
+        cloud_cover = [row.cloud_cover for row in day_rows if row.cloud_cover is not None]
+        conditions = [_condition_for_row(row) for row in day_rows]
+
+        forecast: dict[str, Any] = {"datetime": day_key, "condition": _dominant_condition(conditions)}
+        if temperatures:
+            forecast["temperature"] = max(temperatures)
+            forecast["templow"] = min(temperatures)
+        if precipitation:
+            forecast["precipitation"] = sum(precipitation)
+        if wind_speeds:
+            forecast["wind_speed"] = max(wind_speeds)
+        if gusts:
+            forecast["wind_gust_speed"] = max(gusts)
+        if cloud_cover:
+            forecast["cloud_coverage"] = sum(cloud_cover) / len(cloud_cover)
+        forecasts.append(forecast)
+    return forecasts
+
+
 def _parse_row(
     item: dict[str, Any],
     *,
@@ -158,6 +199,43 @@ def _parse_row(
         source_url=source_url,
         source_run_id=source_run_id,
     )
+
+
+def _row_as_weather_forecast(row: ForecastRow) -> dict[str, Any]:
+    forecast: dict[str, Any] = {
+        "datetime": _format_datetime(row.valid_time),
+        "condition": _condition_for_row(row),
+    }
+    optional_fields = {
+        "temperature": row.temperature,
+        "pressure": row.pressure,
+        "wind_speed": row.wind_speed,
+        "wind_bearing": row.wind_direction,
+        "wind_gust_speed": row.wind_gust,
+        "cloud_coverage": row.cloud_cover,
+        "precipitation": row.precipitation_amount,
+    }
+    forecast.update({key: value for key, value in optional_fields.items() if value is not None})
+    return forecast
+
+
+def _condition_for_row(row: ForecastRow) -> str:
+    if row.precipitation_amount is not None and row.precipitation_amount > 0:
+        return "rainy"
+    if row.cloud_cover is None:
+        return "cloudy"
+    if row.cloud_cover < 20:
+        return "sunny"
+    if row.cloud_cover < 70:
+        return "partlycloudy"
+    return "cloudy"
+
+
+def _dominant_condition(conditions: list[str]) -> str:
+    for condition in ("rainy", "cloudy", "partlycloudy", "sunny"):
+        if condition in conditions:
+            return condition
+    return "cloudy"
 
 
 def _required(payload: dict[str, Any], key: str) -> Any:

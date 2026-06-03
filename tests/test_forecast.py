@@ -102,6 +102,82 @@ class TestForecastHelperContract(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "cannot save an empty forecast cache"):
                 cache.save([])
 
+    def test_rows_as_hourly_forecast_sorts_and_maps_weather_fields(self):
+        rows = forecast.parse_helper_forecast(
+            {
+                "model_run_time": "2026-06-03T00:00:00Z",
+                "source_url": "https://example.test/aladin.json",
+                "source_run_id": "run",
+                "rows": [
+                    {
+                        "valid_time": "2026-06-03T02:00:00Z",
+                        "temperature": 16,
+                        "cloud_cover": 85,
+                    },
+                    {
+                        "valid_time": "2026-06-03T01:00:00Z",
+                        "temperature": 17,
+                        "pressure": 1010,
+                        "wind_speed": 3,
+                        "wind_direction": 180,
+                        "wind_gust": 5,
+                        "cloud_cover": 10,
+                        "precipitation_amount": 0.3,
+                    },
+                ],
+            }
+        )
+
+        hourly = forecast.rows_as_hourly_forecast(rows)
+
+        self.assertEqual(hourly[0]["datetime"], "2026-06-03T01:00:00Z")
+        self.assertEqual(hourly[0]["condition"], "rainy")
+        self.assertEqual(hourly[0]["temperature"], 17.0)
+        self.assertEqual(hourly[0]["pressure"], 1010.0)
+        self.assertEqual(hourly[0]["wind_bearing"], 180.0)
+        self.assertEqual(hourly[0]["wind_gust_speed"], 5.0)
+        self.assertEqual(hourly[0]["precipitation"], 0.3)
+        self.assertEqual(hourly[1]["condition"], "cloudy")
+
+    def test_rows_as_daily_forecast_aggregates_weather_fields(self):
+        rows = forecast.parse_helper_forecast(
+            {
+                "model_run_time": "2026-06-03T00:00:00Z",
+                "source_url": "https://example.test/aladin.json",
+                "source_run_id": "run",
+                "rows": [
+                    {
+                        "valid_time": "2026-06-03T01:00:00Z",
+                        "temperature": 12,
+                        "wind_speed": 2,
+                        "wind_gust": 4,
+                        "cloud_cover": 10,
+                        "precipitation_amount": 0,
+                    },
+                    {
+                        "valid_time": "2026-06-03T15:00:00Z",
+                        "temperature": 21,
+                        "wind_speed": 6,
+                        "wind_gust": 9,
+                        "cloud_cover": 80,
+                        "precipitation_amount": 1.5,
+                    },
+                ],
+            }
+        )
+
+        daily = forecast.rows_as_daily_forecast(rows)
+
+        self.assertEqual(len(daily), 1)
+        self.assertEqual(daily[0]["datetime"], "2026-06-03")
+        self.assertEqual(daily[0]["condition"], "rainy")
+        self.assertEqual(daily[0]["temperature"], 21.0)
+        self.assertEqual(daily[0]["templow"], 12.0)
+        self.assertEqual(daily[0]["precipitation"], 1.5)
+        self.assertEqual(daily[0]["wind_speed"], 6.0)
+        self.assertEqual(daily[0]["wind_gust_speed"], 9.0)
+        self.assertEqual(daily[0]["cloud_coverage"], 45.0)
+
 
 if __name__ == "__main__":
     unittest.main()
