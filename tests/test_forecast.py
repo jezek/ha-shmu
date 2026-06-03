@@ -2,6 +2,7 @@ import importlib.util
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
+import tempfile
 import unittest
 
 
@@ -59,6 +60,47 @@ class TestForecastHelperContract(unittest.TestCase):
                     "rows": [{"valid_time": "2026-06-03T01:00:00Z", "lead_hours": -1}],
                 }
             )
+
+    def test_forecast_cache_round_trips_helper_payload(self):
+        payload = {
+            "model_run_time": "2026-06-03T00:00:00Z",
+            "source_url": "https://example.test/cache.json",
+            "source_run_id": "aladinsk-20260603-0000",
+            "rows": [
+                {
+                    "valid_time": "2026-06-03T01:00:00Z",
+                    "temperature": 17.2,
+                    "pressure": 1011.5,
+                },
+                {
+                    "valid_time": "2026-06-03T02:00:00Z",
+                    "temperature": 16.9,
+                    "precipitation_amount": 0.0,
+                },
+            ],
+        }
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            cache = forecast.ForecastCache(Path(temp_dir) / "point-48.15-17.11.json")
+            cache.save_payload(payload)
+            rows = cache.load()
+
+            self.assertEqual(len(rows), 2)
+            self.assertEqual(rows[0].valid_time, datetime(2026, 6, 3, 1, tzinfo=timezone.utc))
+            self.assertEqual(rows[0].temperature, 17.2)
+            self.assertEqual(rows[1].precipitation_amount, 0.0)
+
+            second_cache = forecast.ForecastCache(Path(temp_dir) / "roundtrip.json")
+            second_cache.save(rows)
+            round_tripped = second_cache.load()
+
+            self.assertEqual([row.as_dict() for row in round_tripped], [row.as_dict() for row in rows])
+
+    def test_forecast_cache_rejects_empty_rows(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            cache = forecast.ForecastCache(Path(temp_dir) / "empty.json")
+            with self.assertRaisesRegex(ValueError, "cannot save an empty forecast cache"):
+                cache.save([])
 
 
 if __name__ == "__main__":

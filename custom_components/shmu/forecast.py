@@ -9,6 +9,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
+import json
+from pathlib import Path
+import tempfile
 from typing import Any
 
 
@@ -70,6 +73,56 @@ def parse_helper_forecast(payload: dict[str, Any]) -> list[ForecastRow]:
             )
         )
     return parsed
+
+
+class ForecastCache:
+    """Tiny JSON file cache for helper-produced normalized forecast rows."""
+
+    def __init__(self, path: str | Path):
+        self._path = Path(path)
+
+    def load(self) -> list[ForecastRow]:
+        """Load and parse cached helper output."""
+        with self._path.open(encoding="utf-8") as handle:
+            payload = json.load(handle)
+        if not isinstance(payload, dict):
+            raise ValueError("cached forecast payload must be an object")
+        return parse_helper_forecast(payload)
+
+    def save(self, rows: list[ForecastRow]) -> None:
+        """Persist rows as compact helper-compatible JSON."""
+        if not rows:
+            raise ValueError("cannot save an empty forecast cache")
+        first = rows[0]
+        payload = {
+            "model_run_time": _format_datetime(first.model_run_time),
+            "source_url": first.source_url,
+            "source_run_id": first.source_run_id,
+            "rows": [
+                {
+                    key: value
+                    for key, value in row.as_dict().items()
+                    if key not in {"model_run_time", "source_url", "source_run_id"}
+                }
+                for row in rows
+            ],
+        }
+        self.save_payload(payload)
+
+    def save_payload(self, payload: dict[str, Any]) -> None:
+        """Persist raw helper payload atomically after validating it."""
+        parse_helper_forecast(payload)
+        self._path.parent.mkdir(parents=True, exist_ok=True)
+        with tempfile.NamedTemporaryFile(
+            "w",
+            encoding="utf-8",
+            dir=self._path.parent,
+            delete=False,
+        ) as handle:
+            json.dump(payload, handle, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+            handle.write("\n")
+            temp_path = Path(handle.name)
+        temp_path.replace(self._path)
 
 
 def _parse_row(
