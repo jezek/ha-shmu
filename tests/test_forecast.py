@@ -250,6 +250,81 @@ class TestForecastHelperContract(unittest.TestCase):
         self.assertIsNone(summary["strongest_gust_speed"])
         self.assertIsNone(summary["next_clear_window_time"])
 
+    def test_forecast_series_filters_field_and_window(self):
+        rows = forecast.parse_helper_forecast(
+            {
+                "model_run_time": "2026-06-03T00:00:00Z",
+                "source_url": "https://example.test/aladin.json",
+                "source_run_id": "run",
+                "rows": [
+                    {"valid_time": "2026-06-03T01:00:00Z", "temperature": 17},
+                    {"valid_time": "2026-06-03T02:00:00Z"},
+                    {"valid_time": "2026-06-03T03:00:00Z", "temperature": 19},
+                ],
+            }
+        )
+
+        series = forecast.forecast_series(
+            rows,
+            "temperature",
+            start=datetime(2026, 6, 3, 2, tzinfo=timezone.utc),
+        )
+
+        self.assertEqual(
+            series,
+            [
+                {
+                    "valid_time": "2026-06-03T03:00:00Z",
+                    "value": 19.0,
+                    "lead_hours": 3.0,
+                    "model_run_time": "2026-06-03T00:00:00Z",
+                    "source_run_id": "run",
+                }
+            ],
+        )
+
+    def test_forecast_series_rejects_unknown_field(self):
+        with self.assertRaisesRegex(ValueError, "unsupported forecast field"):
+            forecast.forecast_series([], "humidity")
+
+    def test_forecast_comparison_matches_nearest_observation(self):
+        rows = forecast.parse_helper_forecast(
+            {
+                "model_run_time": "2026-06-03T00:00:00Z",
+                "source_url": "https://example.test/aladin.json",
+                "source_run_id": "run",
+                "rows": [
+                    {"valid_time": "2026-06-03T01:00:00Z", "temperature": 17},
+                    {"valid_time": "2026-06-03T02:00:00Z", "temperature": 20},
+                ],
+            }
+        )
+
+        comparison = forecast.forecast_comparison(
+            rows,
+            [
+                {"time": "2026-06-03T01:20:00Z", "value": "16.5"},
+                {"time": "2026-06-03T03:00:00Z", "value": 21},
+                {"time": "2026-06-03T02:00:00Z", "value": None},
+            ],
+            "temperature",
+        )
+
+        self.assertEqual(len(comparison), 1)
+        self.assertEqual(comparison[0]["observation_time"], "2026-06-03T01:20:00Z")
+        self.assertEqual(comparison[0]["forecast_valid_time"], "2026-06-03T01:00:00Z")
+        self.assertEqual(comparison[0]["observed_value"], 16.5)
+        self.assertEqual(comparison[0]["forecast_value"], 17.0)
+        self.assertEqual(comparison[0]["error"], 0.5)
+        self.assertEqual(comparison[0]["abs_error"], 0.5)
+        self.assertEqual(comparison[0]["distance_minutes"], 20.0)
+
+    def test_forecast_comparison_rejects_bad_inputs(self):
+        with self.assertRaisesRegex(ValueError, "max_distance_minutes must be non-negative"):
+            forecast.forecast_comparison([], [], "temperature", max_distance_minutes=-1)
+        with self.assertRaisesRegex(ValueError, "missing time"):
+            forecast.forecast_comparison([], [{"value": 1}], "temperature")
+
 
 if __name__ == "__main__":
     unittest.main()

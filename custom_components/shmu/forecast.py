@@ -16,6 +16,15 @@ from typing import Any
 
 PRECIPITATION_THRESHOLD_MM = 0.1
 CLEAR_CLOUD_COVER_THRESHOLD = 30.0
+FORECAST_SERIES_FIELDS = {
+    "temperature",
+    "pressure",
+    "wind_speed",
+    "wind_direction",
+    "wind_gust",
+    "cloud_cover",
+    "precipitation_amount",
+}
 
 
 @dataclass(frozen=True)
@@ -217,6 +226,92 @@ def forecast_summary(rows: list[ForecastRow], now: datetime) -> dict[str, Any]:
     }
 
 
+def forecast_series(
+    rows: list[ForecastRow],
+    field: str,
+    *,
+    start: datetime | None = None,
+    end: datetime | None = None,
+) -> list[dict[str, Any]]:
+    """Return a compact forecast value series for service/dashboard consumers."""
+    _validate_series_field(field)
+    start_utc = _as_aware_utc(start) if start is not None else None
+    end_utc = _as_aware_utc(end) if end is not None else None
+
+    series = []
+    for row in sorted(rows, key=lambda item: item.valid_time):
+        if start_utc is not None and row.valid_time < start_utc:
+            continue
+        if end_utc is not None and row.valid_time > end_utc:
+            continue
+        value = getattr(row, field)
+        if value is None:
+            continue
+        series.append(
+            {
+                "valid_time": _format_datetime(row.valid_time),
+                "value": value,
+                "lead_hours": row.lead_hours,
+                "model_run_time": _format_datetime(row.model_run_time),
+                "source_run_id": row.source_run_id,
+            }
+        )
+    return series
+
+
+def forecast_comparison(
+    rows: list[ForecastRow],
+    observations: list[dict[str, Any]],
+    field: str,
+    *,
+    max_distance_minutes: float = 30.0,
+) -> list[dict[str, Any]]:
+    """Compare forecast rows against observed values by nearest valid time."""
+    _validate_series_field(field)
+    if max_distance_minutes < 0:
+        raise ValueError("max_distance_minutes must be non-negative")
+
+    forecast_rows = [
+        row
+        for row in sorted(rows, key=lambda item: item.valid_time)
+        if getattr(row, field) is not None
+    ]
+    max_distance_seconds = max_distance_minutes * 60
+    comparison = []
+    for index, observation in enumerate(observations):
+        if not isinstance(observation, dict):
+            raise ValueError(f"observations[{index}] must be an object")
+        observed_time = _parse_observation_time(observation, index)
+        observed_value = _optional_float(
+            observation.get("value"),
+            f"observations[{index}].value",
+        )
+        if observed_value is None:
+            continue
+        match = _nearest_row(forecast_rows, observed_time)
+        if match is None:
+            continue
+        distance_seconds = abs((match.valid_time - observed_time).total_seconds())
+        if distance_seconds > max_distance_seconds:
+            continue
+        forecast_value = getattr(match, field)
+        comparison.append(
+            {
+                "observation_time": _format_datetime(observed_time),
+                "forecast_valid_time": _format_datetime(match.valid_time),
+                "observed_value": observed_value,
+                "forecast_value": forecast_value,
+                "error": forecast_value - observed_value,
+                "abs_error": abs(forecast_value - observed_value),
+                "distance_minutes": distance_seconds / 60,
+                "lead_hours": match.lead_hours,
+                "model_run_time": _format_datetime(match.model_run_time),
+                "source_run_id": match.source_run_id,
+            }
+        )
+    return comparison
+
+
 def _parse_row(
     item: dict[str, Any],
     *,
@@ -250,6 +345,23 @@ def _parse_row(
         source_url=source_url,
         source_run_id=source_run_id,
     )
+
+
+def _validate_series_field(field: str) -> None:
+    if field not in FORECAST_SERIES_FIELDS:
+        raise ValueError(f"unsupported forecast field: {field}")
+
+
+def _parse_observation_time(observation: dict[str, Any], index: int) -> datetime:
+    if "time" in observation:
+        return _parse_datetime(observation["time"])
+    if "valid_time" in observation:
+        return _parse_datetime(observation["valid_time"])
+    raise ValueError(f"observations[{index}] missing time")
+
+
+def _nearest_row(rows: list[ForecastRow], target_time: datetime) -> ForecastRow | None:
+    return min(rows, key=lambda row: abs((row.valid_time - target_time).total_seconds()), default=None)
 
 
 def _row_as_weather_forecast(row: ForecastRow) -> dict[str, Any]:
