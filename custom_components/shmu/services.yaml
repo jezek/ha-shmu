@@ -1,0 +1,70 @@
+get_forecast_series:
+  fields:
+    entry_id:
+      example: "01J..."
+      selector:
+        text: {}
+    forecast_cache_path:
+      example: "/config/shmu/forecast.json"
+      selector:
+        text: {}
+    field:
+      required: true
+      example: "temperature"
+      selector:
+        select:
+          options:
+            - "temperature"
+            - "pressure"
+            - "wind_speed"
+            - "wind_direction"
+            - "wind_gust"
+            - "cloud_cover"
+            - "precipitation_amount"
+    start:
+      example: "2026-06-04T00:00:00+02:00"
+      selector:
+        text: {}
+    end:
+      example: "2026-06-05T00:00:00+02:00"
+      selector:
+        text: {}
+
+get_forecast_comparison:
+  fields:
+    entry_id:
+      example: "01J..."
+      selector:
+        text: {}
+    forecast_cache_path:
+      example: "/config/shmu/forecast.json"
+      selector:
+        text: {}
+    field:
+      required: true
+      example: "temperature"
+      selector:
+        select:
+          options:
+            - "temperature"
+            - "pressure"
+            - "wind_speed"
+            - "wind_direction"
+            - "wind_gust"
+            - "cloud_cover"
+            - "precipitation_amount"
+    observations:
+      required: true
+      example:
+        - time: "2026-06-04T10:00:00+02:00"
+          value: 20.4
+      selector:
+        object: {}
+    max_distance_minutes:
+      default: 30
+      selector:
+        number:
+          min: 0
+          max: 180
+          unit_of_measurement: min
+          mode: box
