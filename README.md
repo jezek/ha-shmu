@@ -4,11 +4,14 @@
 This integration fetches meteorological data from the [Slovenský hydrometeorologický ústav (SHMU)](https://www.shmu.sk/) and provides sensors for temperature, humidity, pressure, wind speed, and wind direction. It also generates a meteogram image URL.
 This is only integration, all data is provided by [SHMU Open Data](https://opendata.shmu.sk/).
 
+## Fork
+This is a fork of `https://github.com/3DRIK/ha-shmu`. This fork adds forecast entities.
+
 ## Installation
 
 1. **Add this repository to HACS**:
    - Go to HACS > Integrations > Custom Repositories.
-   - Add `https://github.com/3DRIK/ha-shmu` as a custom repository.
+   - Add `https://github.com/jezek/ha-shmu` as a custom repository.
    - Install the "SHMU" integration.
 
 2. **Configure the integration**:
