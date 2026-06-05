@@ -187,6 +187,58 @@ class SHMUForecastSummarySensor(CoordinatorEntity, SensorEntity):
             return None
         return forecast_summary(rows, now()).get(self._summary_key)
 
+
+class SHMUForecastCacheInfoSensor(CoordinatorEntity, SensorEntity):
+    """Forecast cache freshness sensor backed by helper/cache metadata."""
+
+    def __init__(
+        self,
+        coordinator,
+        cache_path: str,
+        info_key: str,
+        name: str,
+        unit: str | None = None,
+        device_class: SensorDeviceClass | None = None,
+        state_class: SensorStateClass | None = None,
+        icon: str | None = None,
+    ):
+        """Initialize the forecast cache freshness sensor."""
+        super().__init__(coordinator)
+        self._cache = ForecastCache(cache_path)
+        self._info_key = info_key
+        self._attr_name = name
+        self._attr_unique_id = f"{DOMAIN}_{coordinator.config_entry.entry_id}_{info_key}"
+        self._attr_native_unit_of_measurement = unit
+        self._attr_device_class = device_class
+        self._attr_state_class = state_class
+        self._attr_icon = icon
+
+        station_id = coordinator.config_entry.data["station_id"]
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, coordinator.config_entry.entry_id)},
+            name=f"SHMU Station {station_id}",
+            manufacturer="Slovenský hydrometeorologický ústav",
+            model="Weather Station",
+            sw_version="1.0",
+        )
+
+    @property
+    def native_value(self):
+        """Return the selected cache freshness value."""
+        try:
+            value = self._cache.info(now()).get(self._info_key)
+        except FileNotFoundError:
+            return None
+        except ValueError as err:
+            _LOGGER.warning("Invalid SHMU forecast cache: %s", err)
+            return None
+        if self._info_key == "file_modified_time" and isinstance(value, str):
+            return datetime.fromisoformat(value.replace("Z", "+00:00"))
+        if self._info_key == "age_seconds" and value is not None:
+            return round(value)
+        return value
+
+
 async def async_setup_entry(hass, config_entry, async_add_entities):
     """Set up the SHMU sensors."""
     coordinator = hass.data[DOMAIN][config_entry.entry_id]["coordinator"]
@@ -346,6 +398,36 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
                     None,
                     SensorDeviceClass.TIMESTAMP,
                     "mdi:weather-sunny",
+                ),
+                SHMUForecastCacheInfoSensor(
+                    coordinator,
+                    forecast_cache_path,
+                    "file_modified_time",
+                    "Forecast cache modified time",
+                    None,
+                    SensorDeviceClass.TIMESTAMP,
+                    None,
+                    "mdi:file-clock",
+                ),
+                SHMUForecastCacheInfoSensor(
+                    coordinator,
+                    forecast_cache_path,
+                    "age_seconds",
+                    "Forecast cache age",
+                    "s",
+                    None,
+                    SensorStateClass.MEASUREMENT,
+                    "mdi:timer-sand",
+                ),
+                SHMUForecastCacheInfoSensor(
+                    coordinator,
+                    forecast_cache_path,
+                    "row_count",
+                    "Forecast cache row count",
+                    None,
+                    None,
+                    SensorStateClass.MEASUREMENT,
+                    "mdi:table-row",
                 ),
             ]
         )
