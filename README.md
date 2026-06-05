@@ -56,6 +56,20 @@ Add to generic camera as static image:
 or for 10d meteogram:
 `{{state_attr('sensor.shmu_meteogram_url', 'meteogram_10d_url') }}`
 
+## Forecast cache
+
+Forecast entities read a local helper JSON file configured as `forecast_cache_path`.
+Update that cache from cron or a systemd timer with:
+
+```bash
+python3 scripts/update_forecast_cache.py helper-output.json /config/shmu/forecast-cache.json
+```
+
+The source can be a local file, `-` for stdin, or an HTTP(S) URL. The script
+validates the helper JSON through the integration contract and atomically
+replaces the cache file, then prints freshness metadata such as row count, cache
+age, model run time, and valid forecast range.
+
 ## Troubleshooting
 
 - Ensure your station ID is correct.
