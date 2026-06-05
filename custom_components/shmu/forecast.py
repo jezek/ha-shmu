@@ -10,6 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timezone
 import json
+import os
 from pathlib import Path
 import tempfile
 from typing import Any
@@ -101,6 +102,28 @@ class ForecastCache:
         if not isinstance(payload, dict):
             raise ValueError("cached forecast payload must be an object")
         return parse_helper_forecast(payload)
+
+    def info(self, reference_time: datetime | None = None) -> dict[str, Any]:
+        """Return compact freshness metadata for the cached helper output."""
+        rows = self.load()
+        stat = self._path.stat()
+        modified_time = datetime.fromtimestamp(stat.st_mtime, timezone.utc)
+        if reference_time is None:
+            reference_time = datetime.now(timezone.utc)
+        else:
+            reference_time = _as_aware_utc(reference_time)
+
+        return {
+            "path": os.fspath(self._path),
+            "row_count": len(rows),
+            "file_modified_time": _format_datetime(modified_time),
+            "age_seconds": max(0.0, (reference_time - modified_time).total_seconds()),
+            "model_run_time": _format_datetime(rows[0].model_run_time),
+            "oldest_valid_time": _format_datetime(min(row.valid_time for row in rows)),
+            "newest_valid_time": _format_datetime(max(row.valid_time for row in rows)),
+            "source_run_id": rows[0].source_run_id,
+            "source_url": rows[0].source_url,
+        }
 
     def save(self, rows: list[ForecastRow]) -> None:
         """Persist rows as compact helper-compatible JSON."""

@@ -1,4 +1,5 @@
 import importlib.util
+import os
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -101,6 +102,35 @@ class TestForecastHelperContract(unittest.TestCase):
             cache = forecast.ForecastCache(Path(temp_dir) / "empty.json")
             with self.assertRaisesRegex(ValueError, "cannot save an empty forecast cache"):
                 cache.save([])
+
+    def test_forecast_cache_info_reports_freshness_metadata(self):
+        payload = {
+            "model_run_time": "2026-06-03T00:00:00Z",
+            "source_url": "https://example.test/cache.json",
+            "source_run_id": "aladinsk-20260603-0000",
+            "rows": [
+                {"valid_time": "2026-06-03T01:00:00Z", "temperature": 17.2},
+                {"valid_time": "2026-06-03T03:00:00Z", "temperature": 18.4},
+            ],
+        }
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            cache_path = Path(temp_dir) / "freshness.json"
+            cache = forecast.ForecastCache(cache_path)
+            cache.save_payload(payload)
+            modified = datetime(2026, 6, 3, 4, tzinfo=timezone.utc)
+            os.utime(cache_path, (modified.timestamp(), modified.timestamp()))
+
+            info = cache.info(datetime(2026, 6, 3, 5, 30, tzinfo=timezone.utc))
+
+        self.assertEqual(info["path"], str(cache_path))
+        self.assertEqual(info["row_count"], 2)
+        self.assertEqual(info["file_modified_time"], "2026-06-03T04:00:00Z")
+        self.assertEqual(info["age_seconds"], 5400.0)
+        self.assertEqual(info["model_run_time"], "2026-06-03T00:00:00Z")
+        self.assertEqual(info["oldest_valid_time"], "2026-06-03T01:00:00Z")
+        self.assertEqual(info["newest_valid_time"], "2026-06-03T03:00:00Z")
+        self.assertEqual(info["source_run_id"], "aladinsk-20260603-0000")
 
     def test_rows_as_hourly_forecast_sorts_and_maps_weather_fields(self):
         rows = forecast.parse_helper_forecast(
