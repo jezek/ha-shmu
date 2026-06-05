@@ -25,6 +25,7 @@ FORECAST_SERIES_FIELDS = {
     "cloud_cover",
     "precipitation_amount",
 }
+FORECAST_COMPARISON_DECIMALS = 3
 
 
 @dataclass(frozen=True)
@@ -295,14 +296,15 @@ def forecast_comparison(
         if distance_seconds > max_distance_seconds:
             continue
         forecast_value = getattr(match, field)
+        error = _rounded_measurement(forecast_value - observed_value)
         comparison.append(
             {
                 "observation_time": _format_datetime(observed_time),
                 "forecast_valid_time": _format_datetime(match.valid_time),
                 "observed_value": observed_value,
                 "forecast_value": forecast_value,
-                "error": forecast_value - observed_value,
-                "abs_error": abs(forecast_value - observed_value),
+                "error": error,
+                "abs_error": abs(error),
                 "distance_minutes": distance_seconds / 60,
                 "lead_hours": match.lead_hours,
                 "model_run_time": _format_datetime(match.model_run_time),
@@ -310,6 +312,13 @@ def forecast_comparison(
             }
         )
     return comparison
+
+
+def _rounded_measurement(value: float) -> float:
+    rounded = round(value, FORECAST_COMPARISON_DECIMALS)
+    if rounded == 0:
+        return 0.0
+    return rounded
 
 
 def _parse_row(

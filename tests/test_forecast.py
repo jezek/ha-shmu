@@ -319,6 +319,27 @@ class TestForecastHelperContract(unittest.TestCase):
         self.assertEqual(comparison[0]["abs_error"], 0.5)
         self.assertEqual(comparison[0]["distance_minutes"], 20.0)
 
+    def test_forecast_comparison_rounds_floating_point_noise(self):
+        rows = forecast.parse_helper_forecast(
+            {
+                "model_run_time": "2026-06-03T00:00:00Z",
+                "source_url": "https://example.test/aladin.json",
+                "source_run_id": "run",
+                "rows": [
+                    {"valid_time": "2026-06-03T01:00:00Z", "temperature": 15},
+                ],
+            }
+        )
+
+        comparison = forecast.forecast_comparison(
+            rows,
+            [{"time": "2026-06-03T01:00:00Z", "value": 14.8}],
+            "temperature",
+        )
+
+        self.assertEqual(comparison[0]["error"], 0.2)
+        self.assertEqual(comparison[0]["abs_error"], 0.2)
+
     def test_forecast_comparison_rejects_bad_inputs(self):
         with self.assertRaisesRegex(ValueError, "max_distance_minutes must be non-negative"):
             forecast.forecast_comparison([], [], "temperature", max_distance_minutes=-1)
