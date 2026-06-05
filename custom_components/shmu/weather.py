@@ -5,10 +5,10 @@ from __future__ import annotations
 import logging
 
 from homeassistant.components.weather import WeatherEntity, WeatherEntityFeature
-from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import CONF_FORECAST_CACHE_PATH, DOMAIN
+from .entity_helpers import forecast_device_info
 from .forecast import ForecastCache, rows_as_daily_forecast, rows_as_hourly_forecast
 
 _LOGGER = logging.getLogger(__name__)
@@ -30,16 +30,9 @@ class SHMUWeather(CoordinatorEntity, WeatherEntity):
     def __init__(self, coordinator, cache_path: str | None):
         """Initialize the forecast weather entity."""
         super().__init__(coordinator)
-        station_id = coordinator.config_entry.data["station_id"]
         self._cache = ForecastCache(cache_path) if cache_path else None
         self._attr_unique_id = f"{DOMAIN}_{coordinator.config_entry.entry_id}_weather"
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, coordinator.config_entry.entry_id)},
-            name=f"SHMU Station {station_id}",
-            manufacturer="Slovenský hydrometeorologický ústav",
-            model="Weather Station",
-            sw_version="1.0",
-        )
+        self._attr_device_info = forecast_device_info(coordinator)
 
     @property
     def available(self) -> bool:

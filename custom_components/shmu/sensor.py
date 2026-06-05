@@ -1,10 +1,10 @@
 from homeassistant.components.sensor import SensorEntity, SensorDeviceClass, SensorStateClass
 from homeassistant.const import PERCENTAGE
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
-from homeassistant.helpers.entity import DeviceInfo
 from datetime import datetime, timedelta
 import logging
 from .const import CONF_FORECAST_CACHE_PATH, DOMAIN
+from .entity_helpers import forecast_device_info, station_device_info
 from .forecast import ForecastCache, forecast_summary
 from homeassistant.util.dt import now
 
@@ -34,15 +34,7 @@ class SHMUSensor(CoordinatorEntity, SensorEntity):
         self._state_class = state_class
         self._attr_unique_id = f"{DOMAIN}_{coordinator.config_entry.entry_id}_{sensor_key}"
 
-        # Dynamic device name based on station_id
-        station_id = coordinator.config_entry.data["station_id"]
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, coordinator.config_entry.entry_id)},
-            name=f"SHMU Station {station_id}",
-            manufacturer="Slovenský hydrometeorologický ústav",
-            model="Weather Station",
-            sw_version="1.0",
-        )
+        self._attr_device_info = station_device_info(coordinator)
 
     @property
     def unique_id(self) -> str:
@@ -91,15 +83,7 @@ class SHMUMeteogramSensor(CoordinatorEntity, SensorEntity):
         self._attr_icon = "mdi:image"
         self._meteogram_id = meteogram_id or "32737"  # Default meteogram ID
 
-        # Dynamic device name based on station_id
-        station_id = coordinator.config_entry.data["station_id"]
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, coordinator.config_entry.entry_id)},
-            name=f"SHMU Station {station_id}",
-            manufacturer="Slovenský hydrometeorologický ústav",
-            model="Weather Station",
-            sw_version="1.0",
-        )
+        self._attr_device_info = station_device_info(coordinator)
 
     def _generate_meteogram_url(self):
         """Generate the meteogram URL based on current time."""
@@ -166,14 +150,7 @@ class SHMUForecastSummarySensor(CoordinatorEntity, SensorEntity):
         self._attr_device_class = device_class
         self._attr_icon = icon
 
-        station_id = coordinator.config_entry.data["station_id"]
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, coordinator.config_entry.entry_id)},
-            name=f"SHMU Station {station_id}",
-            manufacturer="Slovenský hydrometeorologický ústav",
-            model="Weather Station",
-            sw_version="1.0",
-        )
+        self._attr_device_info = forecast_device_info(coordinator)
 
     @property
     def native_value(self):
@@ -213,14 +190,7 @@ class SHMUForecastCacheInfoSensor(CoordinatorEntity, SensorEntity):
         self._attr_state_class = state_class
         self._attr_icon = icon
 
-        station_id = coordinator.config_entry.data["station_id"]
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, coordinator.config_entry.entry_id)},
-            name=f"SHMU Station {station_id}",
-            manufacturer="Slovenský hydrometeorologický ústav",
-            model="Weather Station",
-            sw_version="1.0",
-        )
+        self._attr_device_info = forecast_device_info(coordinator)
 
     @property
     def native_value(self):
