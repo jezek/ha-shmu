@@ -2,11 +2,12 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
-import aiohttp
 import logging
 from datetime import timedelta
-from .const import DOMAIN
+from .cache_paths import forecast_cache_path_for_entry
+from .const import CONF_FORECAST_SOURCE, DOMAIN
 from .api import SHMUAPI
+from .forecast_update import update_forecast_cache_source
 from .services import async_setup_services, async_unload_services
 
 _LOGGER = logging.getLogger(__name__)
@@ -55,6 +56,31 @@ class SHMUDataUpdateCoordinator(DataUpdateCoordinator):
         """Fetch data from SHMU API."""
         try:
             session = async_get_clientsession(self._hass)
-            return await self._api.fetch_data(session)
+            data = await self._api.fetch_data(session)
+            await self._async_refresh_forecast_cache()
+            return data
         except Exception as err:
             raise UpdateFailed(f"Error communicating with SHMU API: {err}")
+
+    async def _async_refresh_forecast_cache(self) -> None:
+        """Refresh the forecast cache from the configured helper source."""
+        source = self._entry.options.get(
+            CONF_FORECAST_SOURCE,
+            self._entry.data.get(CONF_FORECAST_SOURCE),
+        )
+        if not source:
+            return
+
+        cache_path = forecast_cache_path_for_entry(self._hass, self._entry)
+        try:
+            result = await self._hass.async_add_executor_job(
+                update_forecast_cache_source,
+                cache_path,
+                source,
+            )
+        except Exception as err:
+            _LOGGER.warning("Unable to refresh SHMU forecast cache: %s", err)
+            return
+
+        if result["changed"]:
+            _LOGGER.debug("Refreshed SHMU forecast cache: %s", result["info"])

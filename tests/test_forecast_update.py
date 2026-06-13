@@ -89,6 +89,23 @@ class TestForecastUpdate(unittest.TestCase):
 
         self.assertFalse(cache_path.exists())
 
+    def test_update_forecast_cache_source_reads_local_helper_payload(self):
+        forecast_update = _load_forecast_update()
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            source_path = temp_path / "source.json"
+            cache_path = temp_path / "forecast-cache.json"
+            source_path.write_text(json.dumps(_payload("run-2")), encoding="utf-8")
+
+            result = forecast_update.update_forecast_cache_source(
+                cache_path,
+                str(source_path),
+            )
+
+        self.assertTrue(result["changed"])
+        self.assertEqual(result["info"]["source_run_id"], "run-2")
+
 
 if __name__ == "__main__":
     unittest.main()
