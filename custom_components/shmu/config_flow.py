@@ -2,7 +2,7 @@ from homeassistant import config_entries
 from homeassistant.core import callback
 from homeassistant.data_entry_flow import FlowResult
 import voluptuous as vol
-from .const import CONF_FORECAST_CACHE_PATH, DOMAIN
+from .const import CONF_FORECAST_CACHE_PATH, CONF_FORECAST_SOURCE, DOMAIN
 
 class SHMUConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle a config flow for SHMU."""
@@ -22,6 +22,7 @@ class SHMUConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     "scan_interval": user_input["scan_interval"],
                     "verify_ssl": user_input["verify_ssl"],
                     CONF_FORECAST_CACHE_PATH: user_input.get(CONF_FORECAST_CACHE_PATH, ""),
+                    CONF_FORECAST_SOURCE: user_input.get(CONF_FORECAST_SOURCE, ""),
                 },
             )
 
@@ -34,6 +35,7 @@ class SHMUConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     vol.Optional("scan_interval", default=300): int,
                     vol.Optional("verify_ssl", default=True): bool,
                     vol.Optional(CONF_FORECAST_CACHE_PATH, default=""): str,
+                    vol.Optional(CONF_FORECAST_SOURCE, default=""): str,
                 }
             ),
             errors=errors,
@@ -67,6 +69,13 @@ class SHMUOptionsFlowHandler(config_entries.OptionsFlow):
                         default=self._config_entry.options.get(
                             CONF_FORECAST_CACHE_PATH,
                             self._config_entry.data.get(CONF_FORECAST_CACHE_PATH, ""),
+                        ),
+                    ): str,
+                    vol.Optional(
+                        CONF_FORECAST_SOURCE,
+                        default=self._config_entry.options.get(
+                            CONF_FORECAST_SOURCE,
+                            self._config_entry.data.get(CONF_FORECAST_SOURCE, ""),
                         ),
                     ): str,
                 }

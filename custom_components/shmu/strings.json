@@ -20,6 +20,10 @@
       "forecast_cache_path": {
         "name": "Cesta k forecast cache",
         "description": "Voliteľná cesta k JSON cache súboru vytvorenému SHMU forecast helperom."
+      },
+      "forecast_source": {
+        "name": "Zdroj forecast cache",
+        "description": "Voliteľný lokálny súbor alebo HTTP(S) URL s JSON dátami kompatibilnými so SHMU forecast helperom."
       }
     },
     "en": {
@@ -38,6 +42,10 @@
       "forecast_cache_path": {
         "name": "Forecast cache path",
         "description": "Optional path to the JSON cache file produced by the SHMU forecast helper."
+      },
+      "forecast_source": {
+        "name": "Forecast cache source",
+        "description": "Optional local file or HTTP(S) URL containing JSON data compatible with the SHMU forecast helper."
       }
     }
   }
