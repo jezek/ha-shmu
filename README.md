@@ -63,6 +63,10 @@ uses `/config/shmu/forecast-cache-<entry_id>.json`; `forecast_cache_path` remain
 available as an override.
 `forecast_source` can point at a local file or HTTP(S) URL containing
 helper-compatible JSON for runtime refresh support.
+When `forecast_source` is configured, the integration refreshes the cache during
+the normal SHMU coordinator update. Unchanged `source_run_id` values are skipped
+without rewriting the cache file, and forecast cache refresh failures are logged
+without breaking current station observation sensors.
 
 Update that cache from cron or a systemd timer with:
 
