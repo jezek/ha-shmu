@@ -58,11 +58,14 @@ or for 10d meteogram:
 
 ## Forecast cache
 
-Forecast entities read a local helper JSON file configured as `forecast_cache_path`.
+Forecast entities read a local helper JSON cache. By default, the integration
+uses `/config/shmu/forecast-cache-<entry_id>.json`; `forecast_cache_path` remains
+available as an override.
+
 Update that cache from cron or a systemd timer with:
 
 ```bash
-python3 scripts/update_forecast_cache.py helper-output.json /config/shmu/forecast-cache.json
+python3 scripts/update_forecast_cache.py helper-output.json /config/shmu/forecast-cache-<entry_id>.json
 ```
 
 The source can be a local file, `-` for stdin, or an HTTP(S) URL. The script

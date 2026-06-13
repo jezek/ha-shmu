@@ -3,7 +3,8 @@ from homeassistant.const import PERCENTAGE
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from datetime import datetime, timedelta
 import logging
-from .const import CONF_FORECAST_CACHE_PATH, DOMAIN
+from .cache_paths import forecast_cache_path_for_entry
+from .const import DOMAIN
 from .entity_helpers import forecast_device_info, station_device_info
 from .forecast import ForecastCache, forecast_summary
 from homeassistant.util.dt import now
@@ -299,107 +300,103 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
     if meteogram_id != "none":
         sensors.append(SHMUMeteogramSensor(coordinator, meteogram_id))
 
-    forecast_cache_path = coordinator.config_entry.options.get(
-        CONF_FORECAST_CACHE_PATH,
-        coordinator.config_entry.data.get(CONF_FORECAST_CACHE_PATH),
+    forecast_cache_path = forecast_cache_path_for_entry(hass, coordinator.config_entry)
+    sensors.extend(
+        [
+            SHMUForecastSummarySensor(
+                coordinator,
+                forecast_cache_path,
+                "tomorrow_min_temperature",
+                "Tomorrow minimum temperature",
+                "°C",
+                SensorDeviceClass.TEMPERATURE,
+                "mdi:thermometer-chevron-down",
+            ),
+            SHMUForecastSummarySensor(
+                coordinator,
+                forecast_cache_path,
+                "tomorrow_max_temperature",
+                "Tomorrow maximum temperature",
+                "°C",
+                SensorDeviceClass.TEMPERATURE,
+                "mdi:thermometer-chevron-up",
+            ),
+            SHMUForecastSummarySensor(
+                coordinator,
+                forecast_cache_path,
+                "next_precipitation_time",
+                "Next precipitation time",
+                None,
+                SensorDeviceClass.TIMESTAMP,
+                "mdi:weather-rainy",
+            ),
+            SHMUForecastSummarySensor(
+                coordinator,
+                forecast_cache_path,
+                "next_precipitation_amount",
+                "Next precipitation amount",
+                "mm",
+                None,
+                "mdi:cup-water",
+            ),
+            SHMUForecastSummarySensor(
+                coordinator,
+                forecast_cache_path,
+                "strongest_gust_time",
+                "Strongest gust time",
+                None,
+                SensorDeviceClass.TIMESTAMP,
+                "mdi:weather-windy",
+            ),
+            SHMUForecastSummarySensor(
+                coordinator,
+                forecast_cache_path,
+                "strongest_gust_speed",
+                "Strongest gust speed",
+                "m/s",
+                SensorDeviceClass.WIND_SPEED,
+                "mdi:weather-windy",
+            ),
+            SHMUForecastSummarySensor(
+                coordinator,
+                forecast_cache_path,
+                "next_clear_window_time",
+                "Next clear window time",
+                None,
+                SensorDeviceClass.TIMESTAMP,
+                "mdi:weather-sunny",
+            ),
+            SHMUForecastCacheInfoSensor(
+                coordinator,
+                forecast_cache_path,
+                "file_modified_time",
+                "Forecast cache modified time",
+                None,
+                SensorDeviceClass.TIMESTAMP,
+                None,
+                "mdi:file-clock",
+            ),
+            SHMUForecastCacheInfoSensor(
+                coordinator,
+                forecast_cache_path,
+                "age_seconds",
+                "Forecast cache age",
+                "s",
+                None,
+                SensorStateClass.MEASUREMENT,
+                "mdi:timer-sand",
+            ),
+            SHMUForecastCacheInfoSensor(
+                coordinator,
+                forecast_cache_path,
+                "row_count",
+                "Forecast cache row count",
+                None,
+                None,
+                SensorStateClass.MEASUREMENT,
+                "mdi:table-row",
+            ),
+        ]
     )
-    if forecast_cache_path:
-        sensors.extend(
-            [
-                SHMUForecastSummarySensor(
-                    coordinator,
-                    forecast_cache_path,
-                    "tomorrow_min_temperature",
-                    "Tomorrow minimum temperature",
-                    "°C",
-                    SensorDeviceClass.TEMPERATURE,
-                    "mdi:thermometer-chevron-down",
-                ),
-                SHMUForecastSummarySensor(
-                    coordinator,
-                    forecast_cache_path,
-                    "tomorrow_max_temperature",
-                    "Tomorrow maximum temperature",
-                    "°C",
-                    SensorDeviceClass.TEMPERATURE,
-                    "mdi:thermometer-chevron-up",
-                ),
-                SHMUForecastSummarySensor(
-                    coordinator,
-                    forecast_cache_path,
-                    "next_precipitation_time",
-                    "Next precipitation time",
-                    None,
-                    SensorDeviceClass.TIMESTAMP,
-                    "mdi:weather-rainy",
-                ),
-                SHMUForecastSummarySensor(
-                    coordinator,
-                    forecast_cache_path,
-                    "next_precipitation_amount",
-                    "Next precipitation amount",
-                    "mm",
-                    None,
-                    "mdi:cup-water",
-                ),
-                SHMUForecastSummarySensor(
-                    coordinator,
-                    forecast_cache_path,
-                    "strongest_gust_time",
-                    "Strongest gust time",
-                    None,
-                    SensorDeviceClass.TIMESTAMP,
-                    "mdi:weather-windy",
-                ),
-                SHMUForecastSummarySensor(
-                    coordinator,
-                    forecast_cache_path,
-                    "strongest_gust_speed",
-                    "Strongest gust speed",
-                    "m/s",
-                    SensorDeviceClass.WIND_SPEED,
-                    "mdi:weather-windy",
-                ),
-                SHMUForecastSummarySensor(
-                    coordinator,
-                    forecast_cache_path,
-                    "next_clear_window_time",
-                    "Next clear window time",
-                    None,
-                    SensorDeviceClass.TIMESTAMP,
-                    "mdi:weather-sunny",
-                ),
-                SHMUForecastCacheInfoSensor(
-                    coordinator,
-                    forecast_cache_path,
-                    "file_modified_time",
-                    "Forecast cache modified time",
-                    None,
-                    SensorDeviceClass.TIMESTAMP,
-                    None,
-                    "mdi:file-clock",
-                ),
-                SHMUForecastCacheInfoSensor(
-                    coordinator,
-                    forecast_cache_path,
-                    "age_seconds",
-                    "Forecast cache age",
-                    "s",
-                    None,
-                    SensorStateClass.MEASUREMENT,
-                    "mdi:timer-sand",
-                ),
-                SHMUForecastCacheInfoSensor(
-                    coordinator,
-                    forecast_cache_path,
-                    "row_count",
-                    "Forecast cache row count",
-                    None,
-                    None,
-                    SensorStateClass.MEASUREMENT,
-                    "mdi:table-row",
-                ),
-            ]
-        )
 
     async_add_entities(sensors)

@@ -12,6 +12,7 @@ from homeassistant.core import HomeAssistant, ServiceCall, SupportsResponse
 from homeassistant.exceptions import HomeAssistantError
 import homeassistant.helpers.config_validation as cv
 
+from .cache_paths import forecast_cache_path_for_entry
 from .const import (
     CONF_ENTRY_ID,
     CONF_FORECAST_CACHE_PATH,
@@ -144,25 +145,19 @@ def _cache_path_for_call(hass: HomeAssistant, call: ServiceCall) -> str:
         entry_data = domain_data.get(entry_id)
         if not entry_data:
             raise HomeAssistantError(f"Unknown SHMU entry_id: {entry_id}")
-        return _cache_path_for_entry_data(entry_data)
+        return _cache_path_for_entry_data(hass, entry_data)
 
     entries = [data for key, data in domain_data.items() if key != _SERVICES_REGISTERED]
     if len(entries) != 1:
         raise HomeAssistantError(
             "Set entry_id or forecast_cache_path when multiple/no SHMU entries are loaded"
         )
-    return _cache_path_for_entry_data(entries[0])
+    return _cache_path_for_entry_data(hass, entries[0])
 
 
-def _cache_path_for_entry_data(entry_data: dict[str, Any]) -> str:
+def _cache_path_for_entry_data(hass: HomeAssistant, entry_data: dict[str, Any]) -> str:
     coordinator = entry_data["coordinator"]
-    cache_path = coordinator.config_entry.options.get(
-        CONF_FORECAST_CACHE_PATH,
-        coordinator.config_entry.data.get(CONF_FORECAST_CACHE_PATH),
-    )
-    if not cache_path:
-        raise HomeAssistantError("SHMU forecast_cache_path is not configured")
-    return cache_path
+    return forecast_cache_path_for_entry(hass, coordinator.config_entry)
 
 
 def _parse_service_datetime(value: str | None) -> datetime | None:

@@ -7,7 +7,8 @@ import logging
 from homeassistant.components.weather import WeatherEntity, WeatherEntityFeature
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import CONF_FORECAST_CACHE_PATH, DOMAIN
+from .cache_paths import forecast_cache_path_for_entry
+from .const import DOMAIN
 from .entity_helpers import forecast_device_info
 from .forecast import ForecastCache, rows_as_daily_forecast, rows_as_hourly_forecast
 
@@ -92,8 +93,5 @@ class SHMUWeather(CoordinatorEntity, WeatherEntity):
 async def async_setup_entry(hass, config_entry, async_add_entities):
     """Set up the SHMU weather entity."""
     coordinator = hass.data[DOMAIN][config_entry.entry_id]["coordinator"]
-    cache_path = config_entry.options.get(
-        CONF_FORECAST_CACHE_PATH,
-        config_entry.data.get(CONF_FORECAST_CACHE_PATH),
-    )
+    cache_path = forecast_cache_path_for_entry(hass, config_entry)
     async_add_entities([SHMUWeather(coordinator, cache_path)])
