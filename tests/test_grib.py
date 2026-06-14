@@ -68,6 +68,39 @@ def _product_section(category, number, surface_type, surface_value, forecast_tim
     )
 
 
+def _grid_section(points=5, template=33):
+    return _section(
+        3,
+        b"".join(
+            [
+                bytes([0]),
+                points.to_bytes(4, "big"),
+                bytes([0, 0]),
+                template.to_bytes(2, "big"),
+            ]
+        ),
+    )
+
+
+def _simple_packing_sections():
+    section5 = _section(
+        5,
+        b"".join(
+            [
+                (3).to_bytes(4, "big"),
+                (0).to_bytes(2, "big"),
+                struct.pack(">f", 10.0),
+                (1).to_bytes(2, "big"),
+                (1).to_bytes(2, "big"),
+                bytes([3, 0]),
+            ]
+        ),
+    )
+    section6 = _section(6, bytes([0]) + _pack_bits([1, 0, 1, 1, 0], 1))
+    section7 = _section(7, _pack_bits([1, 2, 3], 3))
+    return section5, section6, section7
+
+
 class TestGrib(unittest.TestCase):
     def test_iter_grib2_messages_reads_concatenated_messages(self):
         grib = _load_grib()
@@ -101,6 +134,14 @@ class TestGrib(unittest.TestCase):
         self.assertEqual(product.first_surface_scaled_value, 2)
         self.assertEqual(product.second_surface_type, 255)
 
+    def test_parse_grid_definition_reads_points_and_template(self):
+        grib = _load_grib()
+
+        grid = grib.parse_grid_definition(_grid_section(points=4512))
+
+        self.assertEqual(grid.template, 33)
+        self.assertEqual(grid.points, 4512)
+
     def test_find_product_message_selects_requested_field(self):
         grib = _load_grib()
         wind = _message([_section(1, b"wind"), _product_section(2, 2, 103, 10)])
@@ -132,26 +173,22 @@ class TestGrib(unittest.TestCase):
 
     def test_decode_simple_packing_grid_expands_bitmap(self):
         grib = _load_grib()
-        section5 = _section(
-            5,
-            b"".join(
-                [
-                    (3).to_bytes(4, "big"),
-                    (0).to_bytes(2, "big"),
-                    struct.pack(">f", 10.0),
-                    (1).to_bytes(2, "big"),
-                    (1).to_bytes(2, "big"),
-                    bytes([3, 0]),
-                ]
-            ),
-        )
-        section6 = _section(6, bytes([0]) + _pack_bits([1, 0, 1, 1, 0], 1))
-        section7 = _section(7, _pack_bits([1, 2, 3], 3))
+        section5, section6, section7 = _simple_packing_sections()
 
         self.assertEqual(
             grib.decode_simple_packing_grid(section5, section6, section7, 5),
             [1.2, None, 1.4, 1.6, None],
         )
+
+    def test_decode_message_grid_uses_section3_point_count(self):
+        grib = _load_grib()
+        message = next(
+            grib.iter_grib2_messages(
+                _message([_grid_section(), _product_section(0, 0, 103, 2), *_simple_packing_sections()])
+            )
+        )
+
+        self.assertEqual(grib.decode_message_grid(message), [1.2, None, 1.4, 1.6, None])
 
     def test_grib_signed_int_uses_sign_and_magnitude(self):
         grib = _load_grib()

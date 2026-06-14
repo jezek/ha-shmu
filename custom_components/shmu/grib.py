@@ -43,6 +43,14 @@ class ProductDefinition:
     second_surface_type: int
 
 
+@dataclass(frozen=True)
+class GridDefinition:
+    """GRIB2 grid metadata needed for value expansion."""
+
+    template: int
+    points: int
+
+
 def iter_grib2_messages(data: bytes):
     """Yield GRIB2 messages from a possibly concatenated GRIB byte stream."""
     position = 0
@@ -82,6 +90,16 @@ def iter_grib2_messages(data: bytes):
             sections=sections,
         )
         position = end
+
+
+def parse_grid_definition(section3: bytes) -> GridDefinition:
+    """Parse GRIB2 section 3 grid metadata needed by the narrow decoder."""
+    if len(section3) < 14 or section3[4] != 3:
+        raise ValueError("section 3 is not a valid GRIB2 grid definition section")
+    return GridDefinition(
+        template=int.from_bytes(section3[12:14], "big"),
+        points=int.from_bytes(section3[6:10], "big"),
+    )
 
 
 def parse_product_definition(section4: bytes) -> ProductDefinition:
@@ -136,6 +154,17 @@ def find_product_message(
             continue
         return message
     return None
+
+
+def decode_message_grid(message: Grib2Message) -> list[float | None]:
+    """Decode a selected simple-packing message into a full grid-value array."""
+    grid = parse_grid_definition(message.section(3))
+    return decode_simple_packing_grid(
+        message.section(5),
+        message.section(6),
+        message.section(7),
+        grid.points,
+    )
 
 
 def decode_simple_packing_grid(
