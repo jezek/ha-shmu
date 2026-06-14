@@ -82,6 +82,24 @@ def _grid_section(points=5, template=33):
     )
 
 
+def _real_template_33_grid_section():
+    return bytes.fromhex(
+        "00 00 00 61 03 00 00 00 "
+        "11 a0 00 00 00 21 06 ff "
+        "ff ff ff ff ff ff ff ff "
+        "ff ff ff ff ff ff 00 00 "
+        "00 5e 00 00 00 30 02 d8 "
+        "7b 36 01 01 1a c7 08 02 "
+        "c1 a3 5d 01 03 66 40 00 "
+        "44 aa 20 00 44 aa 20 00 "
+        "40 02 c1 a3 5d 02 c1 a3 "
+        "5d 00 00 00 00 00 00 00 "
+        "00 00 00 00 5e 00 00 00 "
+        "00 00 00 00 30 00 00 00 "
+        "00"
+    )
+
+
 def _simple_packing_sections():
     section5 = _section(
         5,
@@ -141,6 +159,42 @@ class TestGrib(unittest.TestCase):
 
         self.assertEqual(grid.template, 33)
         self.assertEqual(grid.points, 4512)
+
+    def test_parse_grid_definition_reads_template_33_lambert_fields(self):
+        grib = _load_grib()
+
+        grid = grib.parse_grid_definition(_real_template_33_grid_section())
+
+        self.assertEqual(grid.template, 33)
+        self.assertEqual(grid.points, 4512)
+        self.assertEqual(grid.nx, 94)
+        self.assertEqual(grid.ny, 48)
+        self.assertEqual(grid.latitude_first, 47741750)
+        self.assertEqual(grid.longitude_first, 16849607)
+        self.assertEqual(grid.latitude_d, 46244701)
+        self.assertEqual(grid.longitude_v, 17000000)
+        self.assertEqual(grid.dx, 4500000)
+        self.assertEqual(grid.dy, 4500000)
+        self.assertEqual(grid.scanning_mode, 64)
+        self.assertEqual(grid.latin1, 46244701)
+        self.assertEqual(grid.latin2, 46244701)
+        self.assertEqual(grid.nux, 94)
+        self.assertEqual(grid.nuy, 48)
+
+    def test_lambert_grid_point_lat_lon_maps_template_33_scan_order(self):
+        grib = _load_grib()
+        grid = grib.parse_grid_definition(_real_template_33_grid_section())
+
+        latitude, longitude = grib.lambert_grid_point_lat_lon(grid, 0, 0)
+        east_latitude, east_longitude = grib.lambert_grid_point_lat_lon(grid, 1, 0)
+        north_latitude, north_longitude = grib.lambert_grid_point_lat_lon(grid, 0, 1)
+
+        self.assertAlmostEqual(latitude, 47.74175, places=5)
+        self.assertAlmostEqual(longitude, 16.849607, places=5)
+        self.assertGreater(east_longitude, longitude)
+        self.assertGreater(north_latitude, latitude)
+        self.assertAlmostEqual(east_latitude, latitude, places=1)
+        self.assertAlmostEqual(north_longitude, longitude, places=1)
 
     def test_find_product_message_selects_requested_field(self):
         grib = _load_grib()

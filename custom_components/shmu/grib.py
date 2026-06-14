@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from dataclasses import dataclass
+import math
 import struct
 
 
@@ -49,6 +50,25 @@ class GridDefinition:
 
     template: int
     points: int
+    nx: int | None = None
+    ny: int | None = None
+    latitude_first: int | None = None
+    longitude_first: int | None = None
+    resolution_flags: int | None = None
+    latitude_d: int | None = None
+    longitude_v: int | None = None
+    dx: int | None = None
+    dy: int | None = None
+    projection_centre_flags: int | None = None
+    scanning_mode: int | None = None
+    latin1: int | None = None
+    latin2: int | None = None
+    southern_pole_latitude: int | None = None
+    southern_pole_longitude: int | None = None
+    nux: int | None = None
+    ncx: int | None = None
+    nuy: int | None = None
+    ncy: int | None = None
 
 
 def iter_grib2_messages(data: bytes):
@@ -96,10 +116,33 @@ def parse_grid_definition(section3: bytes) -> GridDefinition:
     """Parse GRIB2 section 3 grid metadata needed by the narrow decoder."""
     if len(section3) < 14 or section3[4] != 3:
         raise ValueError("section 3 is not a valid GRIB2 grid definition section")
-    return GridDefinition(
-        template=int.from_bytes(section3[12:14], "big"),
-        points=int.from_bytes(section3[6:10], "big"),
-    )
+    template = int.from_bytes(section3[12:14], "big")
+    points = int.from_bytes(section3[6:10], "big")
+    if template == 33 and len(section3) >= 97:
+        return GridDefinition(
+            template=template,
+            points=points,
+            nx=_uint(section3, 30, 34),
+            ny=_uint(section3, 34, 38),
+            latitude_first=_grib_signed_slice(section3, 38, 42),
+            longitude_first=_grib_signed_slice(section3, 42, 46),
+            resolution_flags=section3[46],
+            latitude_d=_grib_signed_slice(section3, 47, 51),
+            longitude_v=_grib_signed_slice(section3, 51, 55),
+            dx=_uint(section3, 55, 59),
+            dy=_uint(section3, 59, 63),
+            projection_centre_flags=section3[63],
+            scanning_mode=section3[64],
+            latin1=_grib_signed_slice(section3, 65, 69),
+            latin2=_grib_signed_slice(section3, 69, 73),
+            southern_pole_latitude=_grib_signed_slice(section3, 73, 77),
+            southern_pole_longitude=_grib_signed_slice(section3, 77, 81),
+            nux=_uint(section3, 81, 85),
+            ncx=_uint(section3, 85, 89),
+            nuy=_uint(section3, 89, 93),
+            ncy=_uint(section3, 93, 97),
+        )
+    return GridDefinition(template=template, points=points)
 
 
 def parse_product_definition(section4: bytes) -> ProductDefinition:
@@ -167,6 +210,38 @@ def decode_message_grid(message: Grib2Message) -> list[float | None]:
     )
 
 
+def lambert_grid_point_lat_lon(
+    grid: GridDefinition,
+    column: int,
+    row: int,
+) -> tuple[float, float]:
+    """Return latitude/longitude degrees for a GRIB template 3.33 grid point."""
+    _require_template_33_coordinates(grid)
+    if column < 0 or row < 0 or column >= grid.nx or row >= grid.ny:
+        raise ValueError("grid point is outside the GRIB grid")
+
+    radius = 6371229.0
+    lat_first = _degrees_from_microdegrees(grid.latitude_first)
+    lon_first = _degrees_from_microdegrees(grid.longitude_first)
+    lon_origin = _degrees_from_microdegrees(grid.longitude_v)
+    latin1 = _degrees_from_microdegrees(grid.latin1)
+    latin2 = _degrees_from_microdegrees(grid.latin2)
+
+    x_first, y_first, projection = _lambert_forward(
+        lat_first,
+        lon_first,
+        lon_origin,
+        latin1,
+        latin2,
+        radius,
+    )
+    x_sign = -1 if grid.scanning_mode & 0x80 else 1
+    y_sign = 1 if grid.scanning_mode & 0x40 else -1
+    x = x_first + x_sign * column * _grid_length_meters(grid.dx)
+    y = y_first + y_sign * row * _grid_length_meters(grid.dy)
+    return _lambert_inverse(x, y, lon_origin, projection)
+
+
 def decode_simple_packing_grid(
     section5: bytes,
     section6: bytes,
@@ -230,6 +305,14 @@ def _optional_grib_signed_int(raw: bytes) -> int | None:
     return grib_signed_int(raw)
 
 
+def _uint(data: bytes, start: int, end: int) -> int:
+    return int.from_bytes(data[start:end], "big")
+
+
+def _grib_signed_slice(data: bytes, start: int, end: int) -> int:
+    return grib_signed_int(data[start:end])
+
+
 def _section6_has_bitmap(section6: bytes) -> bool:
     if len(section6) < 6 or section6[4] != 6:
         raise ValueError("section 6 is not a valid GRIB2 bitmap section")
@@ -266,3 +349,78 @@ def _read_unsigned_bits(data: bytes, width: int, count: int) -> list[int]:
             bitpos += 1
         values.append(value)
     return values
+
+
+def _require_template_33_coordinates(grid: GridDefinition) -> None:
+    if grid.template != 33:
+        raise ValueError(f"unsupported coordinate grid template: {grid.template}")
+    required = [
+        grid.nx,
+        grid.ny,
+        grid.latitude_first,
+        grid.longitude_first,
+        grid.longitude_v,
+        grid.dx,
+        grid.dy,
+        grid.scanning_mode,
+        grid.latin1,
+        grid.latin2,
+    ]
+    if any(value is None for value in required):
+        raise ValueError("GRIB template 3.33 coordinate fields are incomplete")
+
+
+def _degrees_from_microdegrees(value: int | None) -> float:
+    if value is None:
+        raise ValueError("missing GRIB coordinate value")
+    return value / 1_000_000
+
+
+def _grid_length_meters(value: int | None) -> float:
+    if value is None:
+        raise ValueError("missing GRIB grid length value")
+    return value / 1000
+
+
+def _lambert_forward(
+    latitude: float,
+    longitude: float,
+    longitude_origin: float,
+    latin1: float,
+    latin2: float,
+    radius: float,
+) -> tuple[float, float, tuple[float, float, float]]:
+    phi = math.radians(latitude)
+    lam = math.radians(longitude)
+    lam0 = math.radians(longitude_origin)
+    phi1 = math.radians(latin1)
+    phi2 = math.radians(latin2)
+    n = _lambert_n(phi1, phi2)
+    factor = math.cos(phi1) * math.tan(math.pi / 4 + phi1 / 2) ** n / n
+    rho = radius * factor / math.tan(math.pi / 4 + phi / 2) ** n
+    theta = n * (lam - lam0)
+    return rho * math.sin(theta), -rho * math.cos(theta), (n, factor, radius)
+
+
+def _lambert_inverse(
+    x: float,
+    y: float,
+    longitude_origin: float,
+    projection: tuple[float, float, float],
+) -> tuple[float, float]:
+    n, factor, radius = projection
+    rho = math.hypot(x, -y)
+    theta = math.atan2(x, -y)
+    phi = 2 * math.atan((radius * factor / rho) ** (1 / n)) - math.pi / 2
+    lam = math.radians(longitude_origin) + theta / n
+    return math.degrees(phi), math.degrees(lam)
+
+
+def _lambert_n(phi1: float, phi2: float) -> float:
+    if abs(phi1 - phi2) < 1e-12:
+        return math.sin(phi1)
+    numerator = math.log(math.cos(phi1) / math.cos(phi2))
+    denominator = math.log(
+        math.tan(math.pi / 4 + phi2 / 2) / math.tan(math.pi / 4 + phi1 / 2)
+    )
+    return numerator / denominator
