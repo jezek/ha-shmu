@@ -27,6 +27,21 @@ class Grib2Message:
             raise ValueError(f"missing GRIB2 section {number}") from err
 
 
+@dataclass(frozen=True)
+class ProductDefinition:
+    """GRIB2 product metadata used to select forecast fields."""
+
+    template: int
+    parameter_category: int
+    parameter_number: int
+    forecast_time_unit: int
+    forecast_time: int
+    first_surface_type: int
+    first_surface_scale_factor: int | None
+    first_surface_scaled_value: int | None
+    second_surface_type: int
+
+
 def iter_grib2_messages(data: bytes):
     """Yield GRIB2 messages from a possibly concatenated GRIB byte stream."""
     position = 0
@@ -66,6 +81,27 @@ def iter_grib2_messages(data: bytes):
             sections=sections,
         )
         position = end
+
+
+def parse_product_definition(section4: bytes) -> ProductDefinition:
+    """Parse the common GRIB2 product definition fields from section 4."""
+    if len(section4) < 29 or section4[4] != 4:
+        raise ValueError("section 4 is not a valid GRIB2 product definition section")
+    template = int.from_bytes(section4[7:9], "big")
+    if template not in {0, 8}:
+        raise ValueError(f"unsupported GRIB2 product definition template: {template}")
+
+    return ProductDefinition(
+        template=template,
+        parameter_category=section4[9],
+        parameter_number=section4[10],
+        forecast_time_unit=section4[17],
+        forecast_time=int.from_bytes(section4[18:22], "big", signed=True),
+        first_surface_type=section4[22],
+        first_surface_scale_factor=_optional_grib_signed_int(section4[23:24]),
+        first_surface_scaled_value=_optional_grib_signed_int(section4[24:28]),
+        second_surface_type=section4[28],
+    )
 
 
 def decode_simple_packing_grid(
@@ -123,6 +159,12 @@ def grib_signed_int(raw: bytes) -> int:
     sign_bit = 1 << (len(raw) * 8 - 1)
     magnitude = value & (sign_bit - 1)
     return -magnitude if value & sign_bit else magnitude
+
+
+def _optional_grib_signed_int(raw: bytes) -> int | None:
+    if all(byte == 0xFF for byte in raw):
+        return None
+    return grib_signed_int(raw)
 
 
 def _section6_has_bitmap(section6: bytes) -> bool:

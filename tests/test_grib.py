@@ -65,6 +65,38 @@ class TestGrib(unittest.TestCase):
         self.assertEqual(messages[1].discipline, 2)
         self.assertEqual(messages[1].section(4), _section(4, b"wind"))
 
+    def test_parse_product_definition_reads_selector_fields(self):
+        grib = _load_grib()
+        section4 = _section(
+            4,
+            b"".join(
+                [
+                    (0).to_bytes(2, "big"),
+                    (0).to_bytes(2, "big"),
+                    bytes([0, 0, 255, 0, 0]),
+                    (0).to_bytes(2, "big"),
+                    bytes([0, 1]),
+                    (5).to_bytes(4, "big"),
+                    bytes([103, 0]),
+                    (2).to_bytes(4, "big"),
+                    bytes([255, 255]),
+                    (0xFFFFFFFF).to_bytes(4, "big"),
+                ]
+            ),
+        )
+
+        product = grib.parse_product_definition(section4)
+
+        self.assertEqual(product.template, 0)
+        self.assertEqual(product.parameter_category, 0)
+        self.assertEqual(product.parameter_number, 0)
+        self.assertEqual(product.forecast_time_unit, 1)
+        self.assertEqual(product.forecast_time, 5)
+        self.assertEqual(product.first_surface_type, 103)
+        self.assertEqual(product.first_surface_scale_factor, 0)
+        self.assertEqual(product.first_surface_scaled_value, 2)
+        self.assertEqual(product.second_surface_type, 255)
+
     def test_decode_simple_packing_grid_expands_bitmap(self):
         grib = _load_grib()
         section5 = _section(
