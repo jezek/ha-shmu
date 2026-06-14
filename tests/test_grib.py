@@ -42,7 +42,29 @@ def _section(number, payload):
     return (len(payload) + 5).to_bytes(4, "big") + bytes([number]) + payload
 
 
+def _message(sections, discipline=0):
+    body = b"".join(sections) + b"7777"
+    length = len(body) + 16
+    return b"GRIB" + b"\0\0" + bytes([discipline, 2]) + length.to_bytes(8, "big") + body
+
+
 class TestGrib(unittest.TestCase):
+    def test_iter_grib2_messages_reads_concatenated_messages(self):
+        grib = _load_grib()
+        first = _message([_section(1, b"a"), _section(4, b"temp")])
+        second = _message([_section(1, b"b"), _section(4, b"wind")], discipline=2)
+
+        messages = list(grib.iter_grib2_messages(first + second))
+
+        self.assertEqual(len(messages), 2)
+        self.assertEqual(messages[0].offset, 0)
+        self.assertEqual(messages[0].length, len(first))
+        self.assertEqual(messages[0].discipline, 0)
+        self.assertEqual(messages[0].section(4), _section(4, b"temp"))
+        self.assertEqual(messages[1].offset, len(first))
+        self.assertEqual(messages[1].discipline, 2)
+        self.assertEqual(messages[1].section(4), _section(4, b"wind"))
+
     def test_decode_simple_packing_grid_expands_bitmap(self):
         grib = _load_grib()
         section5 = _section(

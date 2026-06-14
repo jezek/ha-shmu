@@ -6,7 +6,66 @@ for the inspected ALADIN surface fields, without external GRIB dependencies.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 import struct
+
+
+@dataclass(frozen=True)
+class Grib2Message:
+    """One GRIB2 message extracted from a concatenated GRIB file."""
+
+    offset: int
+    length: int
+    discipline: int
+    sections: dict[int, bytes]
+
+    def section(self, number: int) -> bytes:
+        """Return a required section by number."""
+        try:
+            return self.sections[number]
+        except KeyError as err:
+            raise ValueError(f"missing GRIB2 section {number}") from err
+
+
+def iter_grib2_messages(data: bytes):
+    """Yield GRIB2 messages from a possibly concatenated GRIB byte stream."""
+    position = 0
+    while position < len(data):
+        start = data.find(b"GRIB", position)
+        if start == -1:
+            return
+        if start + 16 > len(data):
+            raise ValueError("truncated GRIB2 indicator section")
+        edition = data[start + 7]
+        if edition != 2:
+            raise ValueError(f"unsupported GRIB edition: {edition}")
+        length = int.from_bytes(data[start + 8 : start + 16], "big")
+        end = start + length
+        if length < 20 or end > len(data):
+            raise ValueError("invalid GRIB2 message length")
+        if data[end - 4 : end] != b"7777":
+            raise ValueError("missing GRIB2 end marker")
+
+        sections: dict[int, bytes] = {}
+        section_position = start + 16
+        while section_position < end - 4:
+            if section_position + 5 > end - 4:
+                raise ValueError("truncated GRIB2 section header")
+            section_length = int.from_bytes(data[section_position : section_position + 4], "big")
+            section_number = data[section_position + 4]
+            section_end = section_position + section_length
+            if section_length < 5 or section_end > end - 4:
+                raise ValueError("invalid GRIB2 section length")
+            sections[section_number] = data[section_position:section_end]
+            section_position = section_end
+
+        yield Grib2Message(
+            offset=start,
+            length=length,
+            discipline=data[start + 6],
+            sections=sections,
+        )
+        position = end
 
 
 def decode_simple_packing_grid(
