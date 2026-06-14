@@ -48,6 +48,26 @@ def _message(sections, discipline=0):
     return b"GRIB" + b"\0\0" + bytes([discipline, 2]) + length.to_bytes(8, "big") + body
 
 
+def _product_section(category, number, surface_type, surface_value, forecast_time=5):
+    return _section(
+        4,
+        b"".join(
+            [
+                (0).to_bytes(2, "big"),
+                (0).to_bytes(2, "big"),
+                bytes([category, number, 255, 0, 0]),
+                (0).to_bytes(2, "big"),
+                bytes([0, 1]),
+                forecast_time.to_bytes(4, "big"),
+                bytes([surface_type, 0]),
+                surface_value.to_bytes(4, "big"),
+                bytes([255, 255]),
+                (0xFFFFFFFF).to_bytes(4, "big"),
+            ]
+        ),
+    )
+
+
 class TestGrib(unittest.TestCase):
     def test_iter_grib2_messages_reads_concatenated_messages(self):
         grib = _load_grib()
@@ -67,23 +87,7 @@ class TestGrib(unittest.TestCase):
 
     def test_parse_product_definition_reads_selector_fields(self):
         grib = _load_grib()
-        section4 = _section(
-            4,
-            b"".join(
-                [
-                    (0).to_bytes(2, "big"),
-                    (0).to_bytes(2, "big"),
-                    bytes([0, 0, 255, 0, 0]),
-                    (0).to_bytes(2, "big"),
-                    bytes([0, 1]),
-                    (5).to_bytes(4, "big"),
-                    bytes([103, 0]),
-                    (2).to_bytes(4, "big"),
-                    bytes([255, 255]),
-                    (0xFFFFFFFF).to_bytes(4, "big"),
-                ]
-            ),
-        )
+        section4 = _product_section(0, 0, 103, 2)
 
         product = grib.parse_product_definition(section4)
 
@@ -96,6 +100,35 @@ class TestGrib(unittest.TestCase):
         self.assertEqual(product.first_surface_scale_factor, 0)
         self.assertEqual(product.first_surface_scaled_value, 2)
         self.assertEqual(product.second_surface_type, 255)
+
+    def test_find_product_message_selects_requested_field(self):
+        grib = _load_grib()
+        wind = _message([_section(1, b"wind"), _product_section(2, 2, 103, 10)])
+        temperature = _message([_section(1, b"temp"), _product_section(0, 0, 103, 2)])
+        messages = list(grib.iter_grib2_messages(wind + temperature))
+
+        match = grib.find_product_message(
+            messages,
+            discipline=0,
+            parameter_category=0,
+            parameter_number=0,
+            first_surface_type=103,
+            first_surface_scaled_value=2,
+            forecast_time=5,
+        )
+
+        self.assertIs(match, messages[1])
+        self.assertIsNone(
+            grib.find_product_message(
+                messages,
+                discipline=0,
+                parameter_category=0,
+                parameter_number=0,
+                first_surface_type=103,
+                first_surface_scaled_value=2,
+                forecast_time=6,
+            )
+        )
 
     def test_decode_simple_packing_grid_expands_bitmap(self):
         grib = _load_grib()

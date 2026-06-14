@@ -6,6 +6,7 @@ for the inspected ALADIN surface fields, without external GRIB dependencies.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 import struct
 
@@ -102,6 +103,39 @@ def parse_product_definition(section4: bytes) -> ProductDefinition:
         first_surface_scaled_value=_optional_grib_signed_int(section4[24:28]),
         second_surface_type=section4[28],
     )
+
+
+def find_product_message(
+    messages: Iterable[Grib2Message],
+    *,
+    discipline: int,
+    parameter_category: int,
+    parameter_number: int,
+    first_surface_type: int,
+    first_surface_scaled_value: int | None = None,
+    forecast_time: int | None = None,
+) -> Grib2Message | None:
+    """Return the first message matching the requested product selector."""
+    for message in messages:
+        if message.discipline != discipline:
+            continue
+        try:
+            product = parse_product_definition(message.section(4))
+        except ValueError:
+            continue
+        if product.parameter_category != parameter_category:
+            continue
+        if product.parameter_number != parameter_number:
+            continue
+        if product.first_surface_type != first_surface_type:
+            continue
+        if first_surface_scaled_value is not None:
+            if product.first_surface_scaled_value != first_surface_scaled_value:
+                continue
+        if forecast_time is not None and product.forecast_time != forecast_time:
+            continue
+        return message
+    return None
 
 
 def decode_simple_packing_grid(
