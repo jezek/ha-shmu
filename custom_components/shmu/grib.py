@@ -71,6 +71,18 @@ class GridDefinition:
     ncy: int | None = None
 
 
+@dataclass(frozen=True)
+class GridPoint:
+    """One decoded grid point selected from a GRIB grid."""
+
+    column: int
+    row: int
+    index: int
+    latitude: float
+    longitude: float
+    distance_m: float
+
+
 def iter_grib2_messages(data: bytes):
     """Yield GRIB2 messages from a possibly concatenated GRIB byte stream."""
     position = 0
@@ -240,6 +252,41 @@ def lambert_grid_point_lat_lon(
     x = x_first + x_sign * column * _grid_length_meters(grid.dx)
     y = y_first + y_sign * row * _grid_length_meters(grid.dy)
     return _lambert_inverse(x, y, lon_origin, projection)
+
+
+def nearest_lambert_grid_point(
+    grid: GridDefinition,
+    latitude: float,
+    longitude: float,
+) -> GridPoint:
+    """Return the nearest template 3.33 grid point for a latitude/longitude."""
+    _require_template_33_coordinates(grid)
+    nearest: GridPoint | None = None
+    for row in range(grid.ny):
+        for column in range(grid.nx):
+            point_latitude, point_longitude = lambert_grid_point_lat_lon(
+                grid,
+                column,
+                row,
+            )
+            distance_m = _haversine_meters(
+                latitude,
+                longitude,
+                point_latitude,
+                point_longitude,
+            )
+            if nearest is None or distance_m < nearest.distance_m:
+                nearest = GridPoint(
+                    column=column,
+                    row=row,
+                    index=row * grid.nx + column,
+                    latitude=point_latitude,
+                    longitude=point_longitude,
+                    distance_m=distance_m,
+                )
+    if nearest is None:
+        raise ValueError("GRIB grid contains no points")
+    return nearest
 
 
 def decode_simple_packing_grid(
@@ -424,3 +471,21 @@ def _lambert_n(phi1: float, phi2: float) -> float:
         math.tan(math.pi / 4 + phi2 / 2) / math.tan(math.pi / 4 + phi1 / 2)
     )
     return numerator / denominator
+
+
+def _haversine_meters(
+    latitude1: float,
+    longitude1: float,
+    latitude2: float,
+    longitude2: float,
+) -> float:
+    radius = 6371229.0
+    phi1 = math.radians(latitude1)
+    phi2 = math.radians(latitude2)
+    delta_phi = phi2 - phi1
+    delta_lambda = math.radians(longitude2 - longitude1)
+    a = (
+        math.sin(delta_phi / 2) ** 2
+        + math.cos(phi1) * math.cos(phi2) * math.sin(delta_lambda / 2) ** 2
+    )
+    return 2 * radius * math.atan2(math.sqrt(a), math.sqrt(1 - a))

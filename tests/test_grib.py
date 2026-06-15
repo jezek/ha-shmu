@@ -196,6 +196,20 @@ class TestGrib(unittest.TestCase):
         self.assertAlmostEqual(east_latitude, latitude, places=1)
         self.assertAlmostEqual(north_longitude, longitude, places=1)
 
+    def test_nearest_lambert_grid_point_returns_value_index(self):
+        grib = _load_grib()
+        grid = grib.parse_grid_definition(_real_template_33_grid_section())
+        latitude, longitude = grib.lambert_grid_point_lat_lon(grid, 1, 1)
+
+        point = grib.nearest_lambert_grid_point(grid, latitude, longitude)
+
+        self.assertEqual(point.column, 1)
+        self.assertEqual(point.row, 1)
+        self.assertEqual(point.index, 95)
+        self.assertAlmostEqual(point.latitude, latitude, places=7)
+        self.assertAlmostEqual(point.longitude, longitude, places=7)
+        self.assertLess(point.distance_m, 1)
+
     def test_find_product_message_selects_requested_field(self):
         grib = _load_grib()
         wind = _message([_section(1, b"wind"), _product_section(2, 2, 103, 10)])
