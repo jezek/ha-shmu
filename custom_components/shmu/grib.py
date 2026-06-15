@@ -83,6 +83,14 @@ class GridPoint:
     distance_m: float
 
 
+@dataclass(frozen=True)
+class GridPointValue:
+    """A decoded GRIB value at a selected grid point."""
+
+    point: GridPoint
+    value: float | None
+
+
 def iter_grib2_messages(data: bytes):
     """Yield GRIB2 messages from a possibly concatenated GRIB byte stream."""
     position = 0
@@ -220,6 +228,20 @@ def decode_message_grid(message: Grib2Message) -> list[float | None]:
         message.section(7),
         grid.points,
     )
+
+
+def decode_nearest_lambert_value(
+    message: Grib2Message,
+    latitude: float,
+    longitude: float,
+) -> GridPointValue:
+    """Decode a message and return the value nearest to a latitude/longitude."""
+    grid = parse_grid_definition(message.section(3))
+    point = nearest_lambert_grid_point(grid, latitude, longitude)
+    values = decode_message_grid(message)
+    if point.index >= len(values):
+        raise ValueError("nearest grid point is outside decoded value array")
+    return GridPointValue(point=point, value=values[point.index])
 
 
 def lambert_grid_point_lat_lon(

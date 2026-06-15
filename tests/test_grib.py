@@ -119,6 +119,25 @@ def _simple_packing_sections():
     return section5, section6, section7
 
 
+def _constant_grid_sections(points=4512, value=280.0):
+    section5 = _section(
+        5,
+        b"".join(
+            [
+                points.to_bytes(4, "big"),
+                (0).to_bytes(2, "big"),
+                struct.pack(">f", value),
+                (0).to_bytes(2, "big"),
+                (0).to_bytes(2, "big"),
+                bytes([0, 0]),
+            ]
+        ),
+    )
+    section6 = _section(6, bytes([255]))
+    section7 = _section(7, b"")
+    return section5, section6, section7
+
+
 class TestGrib(unittest.TestCase):
     def test_iter_grib2_messages_reads_concatenated_messages(self):
         grib = _load_grib()
@@ -209,6 +228,27 @@ class TestGrib(unittest.TestCase):
         self.assertAlmostEqual(point.latitude, latitude, places=7)
         self.assertAlmostEqual(point.longitude, longitude, places=7)
         self.assertLess(point.distance_m, 1)
+
+    def test_decode_nearest_lambert_value_returns_point_value(self):
+        grib = _load_grib()
+        grid = grib.parse_grid_definition(_real_template_33_grid_section())
+        latitude, longitude = grib.lambert_grid_point_lat_lon(grid, 1, 1)
+        message = next(
+            grib.iter_grib2_messages(
+                _message(
+                    [
+                        _real_template_33_grid_section(),
+                        _product_section(0, 0, 103, 2),
+                        *_constant_grid_sections(),
+                    ]
+                )
+            )
+        )
+
+        result = grib.decode_nearest_lambert_value(message, latitude, longitude)
+
+        self.assertEqual(result.point.index, 95)
+        self.assertEqual(result.value, 280.0)
 
     def test_find_product_message_selects_requested_field(self):
         grib = _load_grib()
