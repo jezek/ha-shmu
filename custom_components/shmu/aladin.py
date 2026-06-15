@@ -9,6 +9,9 @@ from typing import Any
 from .grib import decode_nearest_lambert_value, find_product_message, iter_grib2_messages
 
 KELVIN_OFFSET = 273.15
+ALADIN_SK_4_5KM_BASE_URL = (
+    "https://opendata.shmu.sk/meteorology/weather/nwp/aladin/sk/4.5km"
+)
 TEMPERATURE_2M_SELECTOR = {
     "discipline": 0,
     "parameter_category": 0,
@@ -16,6 +19,20 @@ TEMPERATURE_2M_SELECTOR = {
     "first_surface_type": 103,
     "first_surface_scaled_value": 2,
 }
+
+
+def grib_url(model_run_time: datetime, lead_hours: int) -> str:
+    """Return the SHMU OpenData ALADIN SK 4.5 km GRIB URL for one lead."""
+    if lead_hours < 0:
+        raise ValueError("lead_hours must not be negative")
+    model_run_time = _as_utc(model_run_time)
+    run_date = model_run_time.strftime("%Y%m%d")
+    run_hour = model_run_time.strftime("%H%M")
+    lead = f"{lead_hours:03d}"
+    return (
+        f"{ALADIN_SK_4_5KM_BASE_URL}/{run_date}/{run_hour}/"
+        f"al-grib_sk_{lead}-{run_date}-{run_hour}-nwp-.grb"
+    )
 
 
 def temperature_payload(

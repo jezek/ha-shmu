@@ -106,6 +106,24 @@ def _temperature_message(lead_hours, value):
 
 
 class TestAladin(unittest.TestCase):
+    def test_grib_url_formats_opendata_aladin_lead_url(self):
+        aladin = _load_module("aladin")
+
+        self.assertEqual(
+            aladin.grib_url(
+                datetime(2026, 6, 13, 12, tzinfo=timezone.utc),
+                7,
+            ),
+            "https://opendata.shmu.sk/meteorology/weather/nwp/aladin/sk/4.5km/"
+            "20260613/1200/al-grib_sk_007-20260613-1200-nwp-.grb",
+        )
+
+    def test_grib_url_rejects_negative_lead_hours(self):
+        aladin = _load_module("aladin")
+
+        with self.assertRaisesRegex(ValueError, "negative"):
+            aladin.grib_url(datetime(2026, 6, 13, 12, tzinfo=timezone.utc), -1)
+
     def test_temperature_payload_is_forecast_cache_compatible(self):
         aladin = _load_module("aladin")
         forecast = _load_module("forecast")
