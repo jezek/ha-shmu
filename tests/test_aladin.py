@@ -105,6 +105,20 @@ def _temperature_message(lead_hours, value):
     )
 
 
+class _Response:
+    def __init__(self, data):
+        self._data = data
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, traceback):
+        return False
+
+    def read(self):
+        return self._data
+
+
 class TestAladin(unittest.TestCase):
     def test_grib_url_formats_opendata_aladin_lead_url(self):
         aladin = _load_module("aladin")
@@ -123,6 +137,31 @@ class TestAladin(unittest.TestCase):
 
         with self.assertRaisesRegex(ValueError, "negative"):
             aladin.grib_url(datetime(2026, 6, 13, 12, tzinfo=timezone.utc), -1)
+
+    def test_download_grib_lead_uses_opendata_url_and_user_agent(self):
+        aladin = _load_module("aladin")
+        calls = []
+
+        def opener(request, timeout):
+            calls.append((request, timeout))
+            return _Response(b"GRIB")
+
+        lead_hours, data = aladin.download_grib_lead(
+            datetime(2026, 6, 13, 12, tzinfo=timezone.utc),
+            7,
+            timeout=5,
+            opener=opener,
+        )
+
+        self.assertEqual(lead_hours, 7)
+        self.assertEqual(data, b"GRIB")
+        self.assertEqual(calls[0][1], 5)
+        self.assertEqual(
+            calls[0][0].full_url,
+            "https://opendata.shmu.sk/meteorology/weather/nwp/aladin/sk/4.5km/"
+            "20260613/1200/al-grib_sk_007-20260613-1200-nwp-.grb",
+        )
+        self.assertEqual(calls[0][0].get_header("User-agent"), "ha-shmu-aladin/1.0")
 
     def test_temperature_payload_is_forecast_cache_compatible(self):
         aladin = _load_module("aladin")

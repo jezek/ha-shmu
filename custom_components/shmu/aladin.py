@@ -5,10 +5,12 @@ from __future__ import annotations
 from collections.abc import Iterable
 from datetime import datetime, timedelta, timezone
 from typing import Any
+from urllib.request import Request, urlopen
 
 from .grib import decode_nearest_lambert_value, find_product_message, iter_grib2_messages
 
 KELVIN_OFFSET = 273.15
+USER_AGENT = "ha-shmu-aladin/1.0"
 ALADIN_SK_4_5KM_BASE_URL = (
     "https://opendata.shmu.sk/meteorology/weather/nwp/aladin/sk/4.5km"
 )
@@ -33,6 +35,20 @@ def grib_url(model_run_time: datetime, lead_hours: int) -> str:
         f"{ALADIN_SK_4_5KM_BASE_URL}/{run_date}/{run_hour}/"
         f"al-grib_sk_{lead}-{run_date}-{run_hour}-nwp-.grb"
     )
+
+
+def download_grib_lead(
+    model_run_time: datetime,
+    lead_hours: int,
+    *,
+    timeout: int = 30,
+    opener=urlopen,
+) -> tuple[int, bytes]:
+    """Download one SHMU OpenData ALADIN GRIB lead file."""
+    url = grib_url(model_run_time, lead_hours)
+    request = Request(url, headers={"User-Agent": USER_AGENT})
+    with opener(request, timeout=timeout) as response:
+        return lead_hours, response.read()
 
 
 def temperature_payload(
