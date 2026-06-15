@@ -132,6 +132,21 @@ class TestAladin(unittest.TestCase):
             "20260613/1200/al-grib_sk_007-20260613-1200-nwp-.grb",
         )
 
+    def test_run_metadata_formats_stable_run_id_and_url(self):
+        aladin = _load_module("aladin")
+
+        model_run_time = datetime(2026, 6, 13, 12, tzinfo=timezone.utc)
+
+        self.assertEqual(
+            aladin.run_id(model_run_time),
+            "aladin-sk-4.5km-20260613-1200",
+        )
+        self.assertEqual(
+            aladin.run_url(model_run_time),
+            "https://opendata.shmu.sk/meteorology/weather/nwp/aladin/sk/4.5km/"
+            "20260613/1200",
+        )
+
     def test_grib_url_rejects_negative_lead_hours(self):
         aladin = _load_module("aladin")
 

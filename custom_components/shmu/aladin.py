@@ -28,13 +28,24 @@ def grib_url(model_run_time: datetime, lead_hours: int) -> str:
     if lead_hours < 0:
         raise ValueError("lead_hours must not be negative")
     model_run_time = _as_utc(model_run_time)
-    run_date = model_run_time.strftime("%Y%m%d")
-    run_hour = model_run_time.strftime("%H%M")
+    run_date, run_hour = _run_path_parts(model_run_time)
     lead = f"{lead_hours:03d}"
     return (
-        f"{ALADIN_SK_4_5KM_BASE_URL}/{run_date}/{run_hour}/"
+        f"{run_url(model_run_time)}/"
         f"al-grib_sk_{lead}-{run_date}-{run_hour}-nwp-.grb"
     )
+
+
+def run_id(model_run_time: datetime) -> str:
+    """Return a stable SHMU ALADIN run id for cache unchanged checks."""
+    run_date, run_hour = _run_path_parts(_as_utc(model_run_time))
+    return f"aladin-sk-4.5km-{run_date}-{run_hour}"
+
+
+def run_url(model_run_time: datetime) -> str:
+    """Return the SHMU OpenData ALADIN run directory URL."""
+    run_date, run_hour = _run_path_parts(_as_utc(model_run_time))
+    return f"{ALADIN_SK_4_5KM_BASE_URL}/{run_date}/{run_hour}"
 
 
 def download_grib_lead(
@@ -138,3 +149,7 @@ def _as_utc(value: datetime) -> datetime:
 
 def _format_utc(value: datetime) -> str:
     return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def _run_path_parts(model_run_time: datetime) -> tuple[str, str]:
+    return model_run_time.strftime("%Y%m%d"), model_run_time.strftime("%H%M")
