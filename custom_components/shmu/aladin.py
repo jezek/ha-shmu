@@ -51,6 +51,25 @@ def download_grib_lead(
         return lead_hours, response.read()
 
 
+def download_grib_leads(
+    model_run_time: datetime,
+    lead_hours: Iterable[int],
+    *,
+    timeout: int = 30,
+    opener=urlopen,
+) -> list[tuple[int, bytes]]:
+    """Download multiple SHMU OpenData ALADIN GRIB lead files."""
+    return [
+        download_grib_lead(
+            model_run_time,
+            lead,
+            timeout=timeout,
+            opener=opener,
+        )
+        for lead in lead_hours
+    ]
+
+
 def temperature_payload(
     *,
     model_run_time: datetime,

@@ -163,6 +163,36 @@ class TestAladin(unittest.TestCase):
         )
         self.assertEqual(calls[0][0].get_header("User-agent"), "ha-shmu-aladin/1.0")
 
+    def test_download_grib_leads_downloads_each_requested_lead(self):
+        aladin = _load_module("aladin")
+        calls = []
+
+        def opener(request, timeout):
+            calls.append((request.full_url, timeout))
+            lead = request.full_url.split("al-grib_sk_")[1].split("-", 1)[0]
+            return _Response(f"lead-{lead}".encode())
+
+        leads = aladin.download_grib_leads(
+            datetime(2026, 6, 13, 12, tzinfo=timezone.utc),
+            [0, 3, 7],
+            timeout=6,
+            opener=opener,
+        )
+
+        self.assertEqual(
+            leads,
+            [
+                (0, b"lead-000"),
+                (3, b"lead-003"),
+                (7, b"lead-007"),
+            ],
+        )
+        self.assertEqual([timeout for _, timeout in calls], [6, 6, 6])
+        self.assertEqual(
+            [url.split("al-grib_sk_")[1].split("-", 1)[0] for url, _ in calls],
+            ["000", "003", "007"],
+        )
+
     def test_temperature_payload_is_forecast_cache_compatible(self):
         aladin = _load_module("aladin")
         forecast = _load_module("forecast")
