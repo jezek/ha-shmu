@@ -1,5 +1,5 @@
 import importlib.util
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 import struct
 import sys
@@ -147,6 +147,34 @@ class TestAladin(unittest.TestCase):
             "20260613/1200",
         )
 
+    def test_latest_model_run_time_applies_publish_lag_and_run_hours(self):
+        aladin = _load_module("aladin")
+
+        self.assertEqual(
+            aladin.latest_model_run_time(
+                datetime(2026, 6, 16, 20, 2, tzinfo=timezone.utc)
+            ),
+            datetime(2026, 6, 16, 12, tzinfo=timezone.utc),
+        )
+        self.assertEqual(
+            aladin.latest_model_run_time(
+                datetime(2026, 6, 16, 5, 2, tzinfo=timezone.utc)
+            ),
+            datetime(2026, 6, 15, 12, tzinfo=timezone.utc),
+        )
+
+    def test_latest_model_run_time_allows_custom_schedule(self):
+        aladin = _load_module("aladin")
+
+        self.assertEqual(
+            aladin.latest_model_run_time(
+                datetime(2026, 6, 16, 17, tzinfo=timezone.utc),
+                run_hours=(0, 6, 12, 18),
+                availability_lag=timedelta(hours=1),
+            ),
+            datetime(2026, 6, 16, 12, tzinfo=timezone.utc),
+        )
+
     def test_grib_url_rejects_negative_lead_hours(self):
         aladin = _load_module("aladin")
 
@@ -177,6 +205,29 @@ class TestAladin(unittest.TestCase):
             "20260613/1200/al-grib_sk_007-20260613-1200-nwp-.grb",
         )
         self.assertEqual(calls[0][0].get_header("User-agent"), "ha-shmu-aladin/1.0")
+
+    def test_opener_for_verify_ssl_uses_default_urlopen_when_enabled(self):
+        aladin = _load_module("aladin")
+
+        self.assertIs(aladin.opener_for_verify_ssl(True), aladin.urlopen)
+
+    def test_opener_for_verify_ssl_disables_certificate_verification(self):
+        aladin = _load_module("aladin")
+        calls = []
+
+        def fake_urlopen(request, timeout, context):
+            calls.append((request, timeout, context))
+            return _Response(b"GRIB")
+
+        aladin.urlopen = fake_urlopen
+
+        with aladin.opener_for_verify_ssl(False)("request", timeout=7) as response:
+            data = response.read()
+
+        self.assertEqual(data, b"GRIB")
+        self.assertEqual(calls[0][0], "request")
+        self.assertEqual(calls[0][1], 7)
+        self.assertIsNotNone(calls[0][2])
 
     def test_download_grib_leads_downloads_each_requested_lead(self):
         aladin = _load_module("aladin")

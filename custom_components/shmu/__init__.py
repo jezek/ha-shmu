@@ -3,11 +3,12 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 import logging
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 from .cache_paths import forecast_cache_path_for_entry
 from .const import CONF_FORECAST_SOURCE, DOMAIN
 from .api import SHMUAPI
-from .forecast_update import update_forecast_cache_source
+from .forecast import ForecastCache
+from .forecast_jobs import forecast_cache_update_job
 from .services import async_setup_services, async_unload_services
 
 _LOGGER = logging.getLogger(__name__)
@@ -45,6 +46,8 @@ class SHMUDataUpdateCoordinator(DataUpdateCoordinator):
         self._meteogram_id = entry.data.get("meteogram_id", "none")
         self._verify_ssl = entry.data.get("verify_ssl", True)
         self._api = SHMUAPI(self._station_id, self._verify_ssl)
+        self.forecast_rows = []
+        self.forecast_cache_info = {}
         super().__init__(
             hass,
             _LOGGER,
@@ -63,21 +66,28 @@ class SHMUDataUpdateCoordinator(DataUpdateCoordinator):
             raise UpdateFailed(f"Error communicating with SHMU API: {err}")
 
     async def _async_refresh_forecast_cache(self) -> None:
-        """Refresh the forecast cache from the configured helper source."""
+        """Refresh the forecast cache from helper source or native ALADIN data."""
         source = self._entry.options.get(
             CONF_FORECAST_SOURCE,
             self._entry.data.get(CONF_FORECAST_SOURCE),
         )
-        if not source:
-            return
 
         cache_path = forecast_cache_path_for_entry(self._hass, self._entry)
+        update_job = forecast_cache_update_job(
+            cache_path,
+            source=source,
+            now=datetime.now(timezone.utc),
+            latitude=self._hass.config.latitude,
+            longitude=self._hass.config.longitude,
+            verify_ssl=self._verify_ssl,
+        )
+
         try:
-            result = await self._hass.async_add_executor_job(
-                update_forecast_cache_source,
-                cache_path,
-                source,
+            result = await self._hass.async_add_executor_job(update_job)
+            self.forecast_rows = await self._hass.async_add_executor_job(
+                ForecastCache(cache_path).load
             )
+            self.forecast_cache_info = result["info"]
         except Exception as err:
             _LOGGER.warning("Unable to refresh SHMU forecast cache: %s", err)
             return

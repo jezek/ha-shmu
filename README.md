@@ -58,17 +58,19 @@ or for 10d meteogram:
 
 ## Forecast cache
 
-Forecast entities read a local helper JSON cache. By default, the integration
-uses `/config/shmu/forecast-cache-<entry_id>.json`; `forecast_cache_path` remains
-available as an override.
-`forecast_source` can point at a local file or HTTP(S) URL containing
-helper-compatible JSON for runtime refresh support.
-When `forecast_source` is configured, the integration refreshes the cache during
-the normal SHMU coordinator update. Unchanged `source_run_id` values are skipped
+Forecast entities read an integration-managed JSON cache. By default, the
+integration downloads SHMU ALADIN forecast data during the normal coordinator
+update, normalizes station-nearest forecast rows, and writes
+`/config/shmu/forecast-cache-<entry_id>.json`.
+
+`forecast_cache_path` remains available as an advanced override for the cache
+file location. `forecast_source` can point at a local file or HTTP(S) URL
+containing helper-compatible JSON; when configured, that helper source overrides
+the native ALADIN downloader. Unchanged `source_run_id` values are skipped
 without rewriting the cache file, and forecast cache refresh failures are logged
 without breaking current station observation sensors.
 
-Update that cache from cron or a systemd timer with:
+For helper-based setups, update that cache from cron or a systemd timer with:
 
 ```bash
 python3 scripts/update_forecast_cache.py helper-output.json /config/shmu/forecast-cache-<entry_id>.json

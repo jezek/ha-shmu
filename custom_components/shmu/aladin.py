@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ssl
 from collections.abc import Iterable
 from datetime import datetime, timedelta, timezone
 from typing import Any
@@ -21,6 +22,8 @@ TEMPERATURE_2M_SELECTOR = {
     "first_surface_type": 103,
     "first_surface_scaled_value": 2,
 }
+DEFAULT_RUN_HOURS = (0, 12)
+DEFAULT_RUN_AVAILABILITY_LAG = timedelta(hours=6)
 
 
 def grib_url(model_run_time: datetime, lead_hours: int) -> str:
@@ -48,6 +51,34 @@ def run_url(model_run_time: datetime) -> str:
     return f"{ALADIN_SK_4_5KM_BASE_URL}/{run_date}/{run_hour}"
 
 
+def latest_model_run_time(
+    now: datetime,
+    *,
+    run_hours: Iterable[int] = DEFAULT_RUN_HOURS,
+    availability_lag: timedelta = DEFAULT_RUN_AVAILABILITY_LAG,
+) -> datetime:
+    """Return the latest UTC model run time that should be safe to fetch."""
+    reference = _as_utc(now) - availability_lag
+    hours = tuple(sorted(run_hours))
+    if not hours:
+        raise ValueError("run_hours must not be empty")
+    if any(hour < 0 or hour > 23 for hour in hours):
+        raise ValueError("run_hours must contain UTC hours in 0..23")
+
+    for hour in reversed(hours):
+        candidate = reference.replace(hour=hour, minute=0, second=0, microsecond=0)
+        if candidate <= reference:
+            return candidate
+
+    previous_day = reference - timedelta(days=1)
+    return previous_day.replace(
+        hour=hours[-1],
+        minute=0,
+        second=0,
+        microsecond=0,
+    )
+
+
 def download_grib_lead(
     model_run_time: datetime,
     lead_hours: int,
@@ -60,6 +91,19 @@ def download_grib_lead(
     request = Request(url, headers={"User-Agent": USER_AGENT})
     with opener(request, timeout=timeout) as response:
         return lead_hours, response.read()
+
+
+def opener_for_verify_ssl(verify_ssl: bool):
+    """Return a urlopen-compatible opener for the requested SSL policy."""
+    if verify_ssl:
+        return urlopen
+
+    context = ssl._create_unverified_context()
+
+    def _open(request, timeout=30):
+        return urlopen(request, timeout=timeout, context=context)
+
+    return _open
 
 
 def download_grib_leads(

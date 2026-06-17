@@ -2,15 +2,11 @@ from homeassistant.components.sensor import SensorEntity, SensorDeviceClass, Sen
 from homeassistant.const import PERCENTAGE
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from datetime import datetime, timedelta
-import logging
 from .cache_paths import forecast_cache_path_for_entry
 from .const import DOMAIN
 from .entity_helpers import forecast_device_info, station_device_info
-from .forecast import ForecastCache, forecast_summary
+from .forecast import forecast_summary
 from homeassistant.util.dt import now
-
-_LOGGER = logging.getLogger(__name__)
-
 
 class SHMUSensor(CoordinatorEntity, SensorEntity):
     """Representation of a SHMU sensor."""
@@ -143,7 +139,6 @@ class SHMUForecastSummarySensor(CoordinatorEntity, SensorEntity):
     ):
         """Initialize the forecast summary sensor."""
         super().__init__(coordinator)
-        self._cache = ForecastCache(cache_path)
         self._summary_key = summary_key
         self._attr_name = name
         self._attr_unique_id = f"{DOMAIN}_{coordinator.config_entry.entry_id}_{summary_key}"
@@ -156,12 +151,8 @@ class SHMUForecastSummarySensor(CoordinatorEntity, SensorEntity):
     @property
     def native_value(self):
         """Return the selected forecast summary value."""
-        try:
-            rows = self._cache.load()
-        except FileNotFoundError:
-            return None
-        except ValueError as err:
-            _LOGGER.warning("Invalid SHMU forecast cache: %s", err)
+        rows = self.coordinator.forecast_rows
+        if not rows:
             return None
         return forecast_summary(rows, now()).get(self._summary_key)
 
@@ -182,7 +173,6 @@ class SHMUForecastCacheInfoSensor(CoordinatorEntity, SensorEntity):
     ):
         """Initialize the forecast cache freshness sensor."""
         super().__init__(coordinator)
-        self._cache = ForecastCache(cache_path)
         self._info_key = info_key
         self._attr_name = name
         self._attr_unique_id = f"{DOMAIN}_{coordinator.config_entry.entry_id}_{info_key}"
@@ -196,16 +186,17 @@ class SHMUForecastCacheInfoSensor(CoordinatorEntity, SensorEntity):
     @property
     def native_value(self):
         """Return the selected cache freshness value."""
-        try:
-            value = self._cache.info(now()).get(self._info_key)
-        except FileNotFoundError:
+        info = self.coordinator.forecast_cache_info
+        if not info:
             return None
-        except ValueError as err:
-            _LOGGER.warning("Invalid SHMU forecast cache: %s", err)
-            return None
+        value = info.get(self._info_key)
         if self._info_key == "file_modified_time" and isinstance(value, str):
             return datetime.fromisoformat(value.replace("Z", "+00:00"))
         if self._info_key == "age_seconds" and value is not None:
+            modified_time = info.get("file_modified_time")
+            if isinstance(modified_time, str):
+                modified = datetime.fromisoformat(modified_time.replace("Z", "+00:00"))
+                return round(max(0.0, (now() - modified).total_seconds()))
             return round(value)
         return value
 

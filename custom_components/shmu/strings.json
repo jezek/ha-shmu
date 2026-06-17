@@ -19,11 +19,11 @@
       },
       "forecast_cache_path": {
         "name": "Cesta k forecast cache",
-        "description": "Voliteľná cesta k JSON cache súboru vytvorenému SHMU forecast helperom."
+        "description": "Voliteľná vlastná cesta k JSON cache súboru. Pri prázdnej hodnote sa použije cache spravovaná integráciou."
       },
       "forecast_source": {
         "name": "Zdroj forecast cache",
-        "description": "Voliteľný lokálny súbor alebo HTTP(S) URL s JSON dátami kompatibilnými so SHMU forecast helperom."
+        "description": "Voliteľný pokročilý zdroj helper JSON dát. Pri prázdnej hodnote integrácia sťahuje SHMU ALADIN forecast automaticky."
       }
     },
     "en": {
@@ -41,11 +41,11 @@
       },
       "forecast_cache_path": {
         "name": "Forecast cache path",
-        "description": "Optional path to the JSON cache file produced by the SHMU forecast helper."
+        "description": "Optional custom path to the JSON cache file. Leave empty to use the integration-managed cache."
       },
       "forecast_source": {
         "name": "Forecast cache source",
-        "description": "Optional local file or HTTP(S) URL containing JSON data compatible with the SHMU forecast helper."
+        "description": "Optional advanced helper JSON source. Leave empty for automatic SHMU ALADIN forecast downloads."
       }
     }
   }
