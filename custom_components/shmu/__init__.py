@@ -1,5 +1,6 @@
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers.event import async_track_time_change
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 import logging
@@ -48,6 +49,15 @@ class SHMUDataUpdateCoordinator(DataUpdateCoordinator):
         self._api = SHMUAPI(self._station_id, self._verify_ssl)
         self.forecast_rows = []
         self.forecast_cache_info = {}
+        entry.async_on_unload(
+            async_track_time_change(
+                hass,
+                self._handle_midnight_forecast_refresh,
+                hour=0,
+                minute=1,
+                second=0,
+            )
+        )
         super().__init__(
             hass,
             _LOGGER,
@@ -94,3 +104,13 @@ class SHMUDataUpdateCoordinator(DataUpdateCoordinator):
 
         if result["changed"]:
             _LOGGER.debug("Refreshed SHMU forecast cache: %s", result["info"])
+
+    @callback
+    def _handle_midnight_forecast_refresh(self, now) -> None:
+        """Refresh forecast rows just after local midnight."""
+        self._hass.async_create_task(self._async_midnight_forecast_refresh())
+
+    async def _async_midnight_forecast_refresh(self) -> None:
+        """Refresh only forecast cache and notify forecast entities."""
+        await self._async_refresh_forecast_cache()
+        self.async_update_listeners()
