@@ -27,7 +27,10 @@ def forecast_device_info(coordinator) -> DeviceInfo:
         identifiers={(DOMAIN, f"{coordinator.config_entry.entry_id}_forecast")},
         name=f"SHMU Forecast {station_id}",
         manufacturer="Slovenský hydrometeorologický ústav",
-        model="Forecast Cache",
+        model="ALADIN SK 4.5 km Forecast Cache",
+        configuration_url=(
+            "https://opendata.shmu.sk/meteorology/weather/nwp/aladin/sk/4.5km"
+        ),
         sw_version="1.0",
         via_device=station_identifier,
     )

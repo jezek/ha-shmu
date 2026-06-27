@@ -59,7 +59,11 @@ class TestEntityHelpers(unittest.TestCase):
         self.assertEqual(station_info["identifiers"], {("shmu", "entry-123")})
         self.assertEqual(forecast_info["identifiers"], {("shmu", "entry-123_forecast")})
         self.assertEqual(forecast_info["via_device"], ("shmu", "entry-123"))
-        self.assertEqual(forecast_info["model"], "Forecast Cache")
+        self.assertEqual(forecast_info["model"], "ALADIN SK 4.5 km Forecast Cache")
+        self.assertEqual(
+            forecast_info["configuration_url"],
+            "https://opendata.shmu.sk/meteorology/weather/nwp/aladin/sk/4.5km",
+        )
 
 
 if __name__ == "__main__":
