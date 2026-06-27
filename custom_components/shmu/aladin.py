@@ -5,6 +5,7 @@ from __future__ import annotations
 import ssl
 from collections.abc import Iterable
 from datetime import datetime, timedelta, timezone
+import math
 from typing import Any
 from urllib.request import Request, urlopen
 
@@ -21,6 +22,48 @@ TEMPERATURE_2M_SELECTOR = {
     "parameter_number": 0,
     "first_surface_type": 103,
     "first_surface_scaled_value": 2,
+}
+WIND_U_10M_SELECTOR = {
+    "discipline": 0,
+    "parameter_category": 2,
+    "parameter_number": 2,
+    "first_surface_type": 103,
+    "first_surface_scaled_value": 10,
+}
+WIND_V_10M_SELECTOR = {
+    "discipline": 0,
+    "parameter_category": 2,
+    "parameter_number": 3,
+    "first_surface_type": 103,
+    "first_surface_scaled_value": 10,
+}
+GUST_U_10M_SELECTOR = {
+    "discipline": 0,
+    "parameter_category": 2,
+    "parameter_number": 23,
+    "first_surface_type": 103,
+    "first_surface_scaled_value": 10,
+}
+GUST_V_10M_SELECTOR = {
+    "discipline": 0,
+    "parameter_category": 2,
+    "parameter_number": 24,
+    "first_surface_type": 103,
+    "first_surface_scaled_value": 10,
+}
+PRECIPITATION_SELECTOR = {
+    "discipline": 0,
+    "parameter_category": 1,
+    "parameter_number": 193,
+    "first_surface_type": 1,
+    "first_surface_scaled_value": 0,
+}
+CLOUD_COVER_SELECTOR = {
+    "discipline": 192,
+    "parameter_category": 128,
+    "parameter_number": 164,
+    "first_surface_type": 1,
+    "first_surface_scaled_value": 0,
 }
 DEFAULT_RUN_HOURS = (0, 12)
 DEFAULT_RUN_AVAILABILITY_LAG = timedelta(hours=6)
@@ -155,6 +198,42 @@ def temperature_payload(
     }
 
 
+def forecast_payload(
+    *,
+    model_run_time: datetime,
+    source_url: str,
+    source_run_id: str,
+    values: Iterable[dict[str, Any]],
+) -> dict[str, Any]:
+    """Build helper-compatible forecast JSON from decoded ALADIN fields."""
+    model_run_time = _as_utc(model_run_time)
+    rows: list[dict[str, Any]] = []
+    for value in values:
+        lead_hours = int(value["lead_hours"])
+        valid_time = model_run_time + timedelta(hours=lead_hours)
+        rows.append(
+            {
+                "valid_time": _format_utc(valid_time),
+                "lead_hours": lead_hours,
+                "temperature": _round_optional(value.get("temperature_c")),
+                "wind_speed": _round_optional(value.get("wind_speed")),
+                "wind_direction": _round_optional(value.get("wind_direction")),
+                "wind_gust": _round_optional(value.get("wind_gust")),
+                "cloud_cover": _round_optional(value.get("cloud_cover")),
+                "precipitation_amount": _round_optional(
+                    value.get("precipitation_amount")
+                ),
+            }
+        )
+
+    return {
+        "model_run_time": _format_utc(model_run_time),
+        "source_url": source_url,
+        "source_run_id": source_run_id,
+        "rows": rows,
+    }
+
+
 def temperature_payload_from_grib_leads(
     *,
     model_run_time: datetime,
@@ -185,6 +264,92 @@ def temperature_payload_from_grib_leads(
     )
 
 
+def forecast_payload_from_grib_leads(
+    *,
+    model_run_time: datetime,
+    source_url: str,
+    source_run_id: str,
+    latitude: float,
+    longitude: float,
+    grib_leads: Iterable[tuple[int, bytes]],
+) -> dict[str, Any]:
+    """Build helper-compatible forecast JSON from ALADIN GRIB lead files."""
+    values: list[dict[str, Any]] = []
+    for lead_hours, data in grib_leads:
+        messages = tuple(iter_grib2_messages(data))
+        temperature_k = _required_value(
+            messages,
+            selector=TEMPERATURE_2M_SELECTOR,
+            forecast_time=lead_hours,
+            latitude=latitude,
+            longitude=longitude,
+            label="2 m temperature",
+            lead_hours=lead_hours,
+        )
+        wind_u = _optional_value(
+            messages,
+            selector=WIND_U_10M_SELECTOR,
+            forecast_time=lead_hours,
+            latitude=latitude,
+            longitude=longitude,
+        )
+        wind_v = _optional_value(
+            messages,
+            selector=WIND_V_10M_SELECTOR,
+            forecast_time=lead_hours,
+            latitude=latitude,
+            longitude=longitude,
+        )
+        gust_u = _optional_value(
+            messages,
+            selector=GUST_U_10M_SELECTOR,
+            forecast_time=None,
+            latitude=latitude,
+            longitude=longitude,
+        )
+        gust_v = _optional_value(
+            messages,
+            selector=GUST_V_10M_SELECTOR,
+            forecast_time=None,
+            latitude=latitude,
+            longitude=longitude,
+        )
+        precipitation_amount = _optional_value(
+            messages,
+            selector=PRECIPITATION_SELECTOR,
+            forecast_time=None,
+            latitude=latitude,
+            longitude=longitude,
+        )
+        cloud_fraction = _optional_value(
+            messages,
+            selector=CLOUD_COVER_SELECTOR,
+            forecast_time=lead_hours,
+            latitude=latitude,
+            longitude=longitude,
+        )
+        values.append(
+            {
+                "lead_hours": lead_hours,
+                "temperature_c": temperature_k - KELVIN_OFFSET,
+                "wind_speed": _vector_speed(wind_u, wind_v),
+                "wind_direction": _wind_direction(wind_u, wind_v),
+                "wind_gust": _vector_speed(gust_u, gust_v),
+                "cloud_cover": None
+                if cloud_fraction is None
+                else max(0.0, min(100.0, cloud_fraction * 100.0)),
+                "precipitation_amount": precipitation_amount,
+            }
+        )
+
+    return forecast_payload(
+        model_run_time=model_run_time,
+        source_url=source_url,
+        source_run_id=source_run_id,
+        values=values,
+    )
+
+
 def _as_utc(value: datetime) -> datetime:
     if value.tzinfo is None:
         raise ValueError("model_run_time must include timezone")
@@ -197,3 +362,61 @@ def _format_utc(value: datetime) -> str:
 
 def _run_path_parts(model_run_time: datetime) -> tuple[str, str]:
     return model_run_time.strftime("%Y%m%d"), model_run_time.strftime("%H%M")
+
+
+def _required_value(
+    messages,
+    *,
+    selector: dict[str, int],
+    forecast_time: int | None,
+    latitude: float,
+    longitude: float,
+    label: str,
+    lead_hours: int,
+) -> float:
+    value = _optional_value(
+        messages,
+        selector=selector,
+        forecast_time=forecast_time,
+        latitude=latitude,
+        longitude=longitude,
+    )
+    if value is None:
+        raise ValueError(f"missing {label} field for lead {lead_hours}")
+    return value
+
+
+def _optional_value(
+    messages,
+    *,
+    selector: dict[str, int],
+    forecast_time: int | None,
+    latitude: float,
+    longitude: float,
+) -> float | None:
+    message = find_product_message(
+        messages,
+        forecast_time=forecast_time,
+        **selector,
+    )
+    if message is None:
+        return None
+    return decode_nearest_lambert_value(message, latitude, longitude).value
+
+
+def _vector_speed(u_value: float | None, v_value: float | None) -> float | None:
+    if u_value is None or v_value is None:
+        return None
+    return math.hypot(u_value, v_value)
+
+
+def _wind_direction(u_value: float | None, v_value: float | None) -> float | None:
+    if u_value is None or v_value is None:
+        return None
+    if u_value == 0 and v_value == 0:
+        return None
+    return (270.0 - math.degrees(math.atan2(v_value, u_value))) % 360.0
+
+
+def _round_optional(value: float | None) -> float | None:
+    return None if value is None else round(value, 3)

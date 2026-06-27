@@ -38,13 +38,20 @@ def _message(sections, discipline=0):
     return b"GRIB" + b"\0\0" + bytes([discipline, 2]) + length.to_bytes(8, "big") + body
 
 
-def _product_section(category, number, surface_type, surface_value, forecast_time):
+def _product_section(
+    category,
+    number,
+    surface_type,
+    surface_value,
+    forecast_time,
+    template=0,
+):
     return _section(
         4,
         b"".join(
             [
                 (0).to_bytes(2, "big"),
-                (0).to_bytes(2, "big"),
+                template.to_bytes(2, "big"),
                 bytes([category, number, 255, 0, 0]),
                 (0).to_bytes(2, "big"),
                 bytes([0, 1]),
@@ -96,12 +103,33 @@ def _constant_grid_sections(points=4512, value=280.0):
 
 
 def _temperature_message(lead_hours, value):
+    return _field_message(0, 0, 0, 103, 2, lead_hours, value)
+
+
+def _field_message(
+    discipline,
+    category,
+    number,
+    surface_type,
+    surface_value,
+    forecast_time,
+    value,
+    template=0,
+):
     return _message(
         [
             _real_template_33_grid_section(),
-            _product_section(0, 0, 103, 2, lead_hours),
+            _product_section(
+                category,
+                number,
+                surface_type,
+                surface_value,
+                forecast_time,
+                template=template,
+            ),
             *_constant_grid_sections(value=value),
-        ]
+        ],
+        discipline=discipline,
     )
 
 
@@ -297,6 +325,38 @@ class TestAladin(unittest.TestCase):
 
         self.assertEqual([row.lead_hours for row in rows], [0, 1])
         self.assertEqual([row.temperature for row in rows], [21.505, 22.005])
+
+    def test_forecast_payload_from_grib_leads_decodes_native_forecast_fields(self):
+        aladin = _load_module("aladin")
+        forecast = _load_module("forecast")
+        lead_1 = b"".join(
+            [
+                _temperature_message(1, 294.655),
+                _field_message(0, 2, 2, 103, 10, 1, 3.0),
+                _field_message(0, 2, 3, 103, 10, 1, 4.0),
+                _field_message(0, 2, 23, 103, 10, 0, 6.0, template=8),
+                _field_message(0, 2, 24, 103, 10, 0, 8.0, template=8),
+                _field_message(0, 1, 193, 1, 0, 0, 2.5, template=8),
+                _field_message(192, 128, 164, 1, 0, 1, 0.42),
+            ]
+        )
+
+        payload = aladin.forecast_payload_from_grib_leads(
+            model_run_time=datetime(2026, 6, 13, 12, tzinfo=timezone.utc),
+            source_url="https://opendata.shmu.sk/run/",
+            source_run_id="aladin-20260613-1200",
+            latitude=47.74175,
+            longitude=16.849607,
+            grib_leads=[(1, lead_1)],
+        )
+        rows = forecast.parse_helper_forecast(payload)
+
+        self.assertEqual(rows[0].temperature, 21.505)
+        self.assertEqual(rows[0].wind_speed, 5.0)
+        self.assertEqual(rows[0].wind_direction, 216.87)
+        self.assertEqual(rows[0].wind_gust, 10.0)
+        self.assertEqual(rows[0].precipitation_amount, 2.5)
+        self.assertEqual(rows[0].cloud_cover, 42.0)
 
     def test_temperature_payload_rejects_naive_model_run_time(self):
         aladin = _load_module("aladin")

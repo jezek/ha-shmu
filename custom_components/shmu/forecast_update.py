@@ -12,11 +12,11 @@ from urllib.request import Request, urlopen
 
 from .aladin import (
     download_grib_leads,
+    forecast_payload_from_grib_leads,
     latest_model_run_time,
     opener_for_verify_ssl,
     run_id,
     run_url,
-    temperature_payload_from_grib_leads,
 )
 from .forecast import ForecastCache, parse_helper_forecast
 
@@ -69,7 +69,7 @@ def update_forecast_cache_aladin_temperature(
         return {"changed": False, "info": current_info}
 
     selected_opener = opener if opener is not None else opener_for_verify_ssl(verify_ssl)
-    payload = temperature_payload_from_grib_leads(
+    payload = forecast_payload_from_grib_leads(
         model_run_time=model_run_time,
         source_url=run_url(model_run_time),
         source_run_id=source_run_id,
