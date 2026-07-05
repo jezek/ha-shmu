@@ -65,7 +65,7 @@ CLOUD_COVER_SELECTOR = {
     "first_surface_type": 1,
     "first_surface_scaled_value": 0,
 }
-DEFAULT_RUN_HOURS = (0, 12)
+DEFAULT_RUN_HOURS = (0, 6, 12, 18)
 DEFAULT_RUN_AVAILABILITY_LAG = timedelta(hours=6)
 
 

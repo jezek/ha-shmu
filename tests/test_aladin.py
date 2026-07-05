@@ -188,7 +188,13 @@ class TestAladin(unittest.TestCase):
             aladin.latest_model_run_time(
                 datetime(2026, 6, 16, 5, 2, tzinfo=timezone.utc)
             ),
-            datetime(2026, 6, 15, 12, tzinfo=timezone.utc),
+            datetime(2026, 6, 15, 18, tzinfo=timezone.utc),
+        )
+        self.assertEqual(
+            aladin.latest_model_run_time(
+                datetime(2026, 6, 16, 14, 2, tzinfo=timezone.utc)
+            ),
+            datetime(2026, 6, 16, 6, tzinfo=timezone.utc),
         )
 
     def test_latest_model_run_time_allows_custom_schedule(self):
