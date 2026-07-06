@@ -19,6 +19,7 @@ from .const import (
     DOMAIN,
     SERVICE_GET_FORECAST_COMPARISON,
     SERVICE_GET_FORECAST_SERIES,
+    SERVICE_REFRESH_FORECAST_CACHE,
 )
 from .forecast import (
     FORECAST_SERIES_FIELDS,
@@ -60,6 +61,12 @@ GET_FORECAST_COMPARISON_SCHEMA = vol.Schema(
     }
 )
 
+REFRESH_FORECAST_CACHE_SCHEMA = vol.Schema(
+    {
+        vol.Optional(CONF_ENTRY_ID): cv.string,
+    }
+)
+
 
 async def async_setup_services(hass: HomeAssistant) -> None:
     """Register SHMU forecast services once per Home Assistant instance."""
@@ -93,6 +100,19 @@ async def async_setup_services(hass: HomeAssistant) -> None:
             raise HomeAssistantError(str(err)) from err
         return {"comparison": comparison, "count": len(comparison)}
 
+    async def refresh_forecast_cache(call: ServiceCall) -> dict[str, Any]:
+        entry_data = _entry_data_for_call(hass, call)
+        coordinator = entry_data["coordinator"]
+        result = await coordinator._async_refresh_forecast_cache()
+        coordinator.async_update_listeners()
+        if result is None:
+            raise HomeAssistantError("SHMU forecast cache refresh failed")
+        return {
+            "entry_id": coordinator.config_entry.entry_id,
+            "changed": result["changed"],
+            "info": result["info"],
+        }
+
     hass.services.async_register(
         DOMAIN,
         SERVICE_GET_FORECAST_SERIES,
@@ -105,6 +125,13 @@ async def async_setup_services(hass: HomeAssistant) -> None:
         SERVICE_GET_FORECAST_COMPARISON,
         get_forecast_comparison,
         schema=GET_FORECAST_COMPARISON_SCHEMA,
+        supports_response=SupportsResponse.ONLY,
+    )
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_REFRESH_FORECAST_CACHE,
+        refresh_forecast_cache,
+        schema=REFRESH_FORECAST_CACHE_SCHEMA,
         supports_response=SupportsResponse.ONLY,
     )
     hass.data[DOMAIN][_SERVICES_REGISTERED] = True
@@ -121,6 +148,7 @@ async def async_unload_services(hass: HomeAssistant) -> None:
 
     hass.services.async_remove(DOMAIN, SERVICE_GET_FORECAST_SERIES)
     hass.services.async_remove(DOMAIN, SERVICE_GET_FORECAST_COMPARISON)
+    hass.services.async_remove(DOMAIN, SERVICE_REFRESH_FORECAST_CACHE)
     domain_data.pop(_SERVICES_REGISTERED, None)
 
 
@@ -153,6 +181,21 @@ def _cache_path_for_call(hass: HomeAssistant, call: ServiceCall) -> str:
             "Set entry_id or forecast_cache_path when multiple/no SHMU entries are loaded"
         )
     return _cache_path_for_entry_data(hass, entries[0])
+
+
+def _entry_data_for_call(hass: HomeAssistant, call: ServiceCall) -> dict[str, Any]:
+    domain_data = hass.data.get(DOMAIN, {})
+    entry_id = call.data.get(CONF_ENTRY_ID)
+    if entry_id:
+        entry_data = domain_data.get(entry_id)
+        if not entry_data:
+            raise HomeAssistantError(f"Unknown SHMU entry_id: {entry_id}")
+        return entry_data
+
+    entries = [data for key, data in domain_data.items() if key != _SERVICES_REGISTERED]
+    if len(entries) != 1:
+        raise HomeAssistantError("Set entry_id when multiple/no SHMU entries are loaded")
+    return entries[0]
 
 
 def _cache_path_for_entry_data(hass: HomeAssistant, entry_data: dict[str, Any]) -> str:

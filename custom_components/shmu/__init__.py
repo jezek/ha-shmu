@@ -75,7 +75,7 @@ class SHMUDataUpdateCoordinator(DataUpdateCoordinator):
         except Exception as err:
             raise UpdateFailed(f"Error communicating with SHMU API: {err}")
 
-    async def _async_refresh_forecast_cache(self) -> None:
+    async def _async_refresh_forecast_cache(self):
         """Refresh the forecast cache from helper source or native ALADIN data."""
         source = self._entry.options.get(
             CONF_FORECAST_SOURCE,
@@ -100,10 +100,11 @@ class SHMUDataUpdateCoordinator(DataUpdateCoordinator):
             self.forecast_cache_info = result["info"]
         except Exception as err:
             _LOGGER.warning("Unable to refresh SHMU forecast cache: %s", err)
-            return
+            return None
 
         if result["changed"]:
             _LOGGER.debug("Refreshed SHMU forecast cache: %s", result["info"])
+        return result
 
     @callback
     def _handle_midnight_forecast_refresh(self, now) -> None:

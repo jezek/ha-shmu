@@ -66,5 +66,12 @@ get_forecast_comparison:
         number:
           min: 0
           max: 180
-          unit_of_measurement: min
-          mode: box
+        unit_of_measurement: min
+        mode: box
+
+refresh_forecast_cache:
+  fields:
+    entry_id:
+      example: "01J..."
+      selector:
+        text: {}

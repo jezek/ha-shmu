@@ -8,3 +8,4 @@ CONF_ENTRY_ID = "entry_id"
 
 SERVICE_GET_FORECAST_SERIES = "get_forecast_series"
 SERVICE_GET_FORECAST_COMPARISON = "get_forecast_comparison"
+SERVICE_REFRESH_FORECAST_CACHE = "refresh_forecast_cache"
