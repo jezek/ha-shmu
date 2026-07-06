@@ -190,7 +190,12 @@ class SHMUForecastCacheInfoSensor(CoordinatorEntity, SensorEntity):
         if not info:
             return None
         value = info.get(self._info_key)
-        if self._info_key == "file_modified_time" and isinstance(value, str):
+        if self._info_key in {
+            "file_modified_time",
+            "model_run_time",
+            "oldest_valid_time",
+            "newest_valid_time",
+        } and isinstance(value, str):
             return datetime.fromisoformat(value.replace("Z", "+00:00"))
         if self._info_key == "age_seconds" and value is not None:
             modified_time = info.get("file_modified_time")
@@ -386,6 +391,46 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
                 None,
                 SensorStateClass.MEASUREMENT,
                 "mdi:table-row",
+            ),
+            SHMUForecastCacheInfoSensor(
+                coordinator,
+                forecast_cache_path,
+                "model_run_time",
+                "Forecast model run time",
+                None,
+                SensorDeviceClass.TIMESTAMP,
+                None,
+                "mdi:clock-start",
+            ),
+            SHMUForecastCacheInfoSensor(
+                coordinator,
+                forecast_cache_path,
+                "oldest_valid_time",
+                "Forecast oldest valid time",
+                None,
+                SensorDeviceClass.TIMESTAMP,
+                None,
+                "mdi:clock-outline",
+            ),
+            SHMUForecastCacheInfoSensor(
+                coordinator,
+                forecast_cache_path,
+                "newest_valid_time",
+                "Forecast newest valid time",
+                None,
+                SensorDeviceClass.TIMESTAMP,
+                None,
+                "mdi:clock-end",
+            ),
+            SHMUForecastCacheInfoSensor(
+                coordinator,
+                forecast_cache_path,
+                "source_run_id",
+                "Forecast source run",
+                None,
+                None,
+                None,
+                "mdi:identifier",
             ),
         ]
     )
