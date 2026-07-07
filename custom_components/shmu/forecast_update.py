@@ -18,23 +18,37 @@ from .aladin import (
     run_id,
     run_url,
 )
+from .epsgram import ecmwf_helper_payload, latest_station_product, product_json_url
 from .forecast import ForecastCache, parse_helper_forecast
 
 DEFAULT_ALADIN_TEMPERATURE_LEAD_HOURS = tuple(range(49))
+FORECAST_CACHE_USER_AGENT = "ha-shmu-forecast-cache/1.0"
+SHMU_EPSGRAM_STATION_PRODUCTS_URL = (
+    "https://www.shmu.sk/api/v1/nwp/getstationproducts?station={station_id}"
+)
 
 
 def read_helper_payload(source: str) -> dict[str, Any]:
     """Read helper-compatible JSON from a local file or HTTP(S) URL."""
     if urlparse(source).scheme in {"http", "https"}:
-        request = Request(source, headers={"User-Agent": "ha-shmu-forecast-cache/1.0"})
-        with urlopen(request, timeout=30) as response:
-            payload = json.load(response)
+        payload = read_json_url(source)
     else:
         with Path(source).open(encoding="utf-8") as handle:
             payload = json.load(handle)
 
     if not isinstance(payload, dict):
         raise ValueError("helper payload must be a JSON object")
+    return payload
+
+
+def read_json_url(source: str, *, timeout: int = 30, opener=None) -> dict[str, Any]:
+    """Read a JSON object from an HTTP(S) URL."""
+    request = Request(source, headers={"User-Agent": FORECAST_CACHE_USER_AGENT})
+    selected_opener = opener if opener is not None else urlopen
+    with selected_opener(request, timeout=timeout) as response:
+        payload = json.load(response)
+    if not isinstance(payload, dict):
+        raise ValueError("JSON URL payload must be an object")
     return payload
 
 
@@ -108,6 +122,29 @@ def update_forecast_cache_latest_aladin_temperature(
         timeout=timeout,
         verify_ssl=verify_ssl,
         opener=opener,
+    )
+
+
+def update_forecast_cache_latest_ecmwf_epsgram(
+    cache_path: str | Path,
+    *,
+    station_id: str,
+    timeout: int = 30,
+    opener=None,
+) -> dict[str, Any]:
+    """Update the cache from the latest interactive ECMWF EPSGRAM product."""
+    station_products_url = SHMU_EPSGRAM_STATION_PRODUCTS_URL.format(station_id=station_id)
+    station_products = read_json_url(station_products_url, timeout=timeout, opener=opener)
+    product = latest_station_product(station_products, "ecmwf")
+    file_link = product.get("file_link")
+    if not isinstance(file_link, str):
+        raise ValueError("ECMWF station product must contain file_link")
+
+    source_url = product_json_url(file_link)
+    epsgram_payload = read_json_url(source_url, timeout=timeout, opener=opener)
+    return update_forecast_cache_payload(
+        cache_path,
+        ecmwf_helper_payload(epsgram_payload, source_url),
     )
 
 

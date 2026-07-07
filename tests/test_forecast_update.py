@@ -45,6 +45,10 @@ def _payload(source_run_id="run-1", temperature=17.2):
     }
 
 
+def _json_response(payload):
+    return _Response(json.dumps(payload).encode("utf-8"))
+
+
 def _section(number, payload):
     return (len(payload) + 5).to_bytes(4, "big") + bytes([number]) + payload
 
@@ -295,6 +299,76 @@ class TestForecastUpdate(unittest.TestCase):
         self.assertTrue(result["changed"])
         self.assertEqual(written["source_run_id"], "aladin-sk-4.5km-20260616-1200")
         self.assertIn("/20260616/1200/al-grib_sk_000-20260616-1200-", calls[0])
+
+    def test_update_forecast_cache_latest_ecmwf_epsgram_writes_cache(self):
+        forecast_update = _load_forecast_update()
+        calls = []
+
+        def opener(request, timeout):
+            calls.append((request.full_url, timeout))
+            if request.full_url.endswith("getstationproducts?station=31396"):
+                return _json_response(
+                    {
+                        "data": [
+                            {
+                                "type": "aladin",
+                                "runtime": 1783306800,
+                                "file_link": "aladin/2026-07-06/31396.json",
+                            },
+                            {
+                                "type": "ecmwf",
+                                "runtime": 1783296000,
+                                "file_link": "ecmwf/2026-07-06/31396_2026-07-06_00.json",
+                            },
+                        ]
+                    }
+                )
+            return _json_response(
+                {
+                    "data_date_time": "2026-07-06T00:00Z",
+                    "si_id": "31396",
+                    "Air_temperature_at_2m": {
+                        "columns": [
+                            "Time",
+                            "Minimum",
+                            "Lower quartile",
+                            "Median",
+                            "Upper quartile",
+                            "Maximum",
+                        ],
+                        "data": [[1783296000, 16.0, 16.9, 17.592, 18.0, 18.9]],
+                    },
+                    "Total_cloud_cover": {
+                        "columns": [
+                            "Time",
+                            "Minimum",
+                            "Lower quartile",
+                            "Median",
+                            "Upper quartile",
+                            "Maximum",
+                        ],
+                        "data": [[1783296000, 24.7, 37.0, 47.745, 61.0, 87.8]],
+                    },
+                }
+            )
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            cache_path = Path(temp_dir) / "forecast-cache.json"
+
+            result = forecast_update.update_forecast_cache_latest_ecmwf_epsgram(
+                cache_path,
+                station_id="31396",
+                timeout=5,
+                opener=opener,
+            )
+            written = json.loads(cache_path.read_text(encoding="utf-8"))
+
+        self.assertTrue(result["changed"])
+        self.assertEqual(written["source_run_id"], "ecmwf-31396-2026-07-06T00:00:00Z")
+        self.assertEqual(written["source_url"], calls[1][0])
+        self.assertEqual(written["rows"][0]["temperature"], 17.592)
+        self.assertEqual(written["rows"][0]["cloud_cover"], 47.745)
+        self.assertEqual([timeout for _, timeout in calls], [5, 5])
 
 
 if __name__ == "__main__":
