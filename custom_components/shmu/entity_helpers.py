@@ -34,3 +34,18 @@ def forecast_device_info(coordinator) -> DeviceInfo:
         sw_version="1.0",
         via_device=station_identifier,
     )
+
+
+def ecmwf_epsgram_device_info(coordinator) -> DeviceInfo:
+    """Return device metadata for ECMWF EPSGRAM forecast entities."""
+    station_id = coordinator.config_entry.data["station_id"]
+    station_identifier = (DOMAIN, coordinator.config_entry.entry_id)
+    return DeviceInfo(
+        identifiers={(DOMAIN, f"{coordinator.config_entry.entry_id}_ecmwf_epsgram")},
+        name=f"SHMU ECMWF EPSGRAM {station_id}",
+        manufacturer="Slovenský hydrometeorologický ústav",
+        model="ECMWF ENS EPSGRAM Forecast Cache",
+        configuration_url="https://www.shmu.sk/sk/?page=2673",
+        sw_version="1.0",
+        via_device=station_identifier,
+    )

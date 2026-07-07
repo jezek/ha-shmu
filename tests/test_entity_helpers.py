@@ -65,6 +65,26 @@ class TestEntityHelpers(unittest.TestCase):
             "https://opendata.shmu.sk/meteorology/weather/nwp/aladin/sk/4.5km",
         )
 
+    def test_ecmwf_epsgram_device_is_split_from_station_and_aladin_forecast(self):
+        helpers = _load_entity_helpers()
+
+        station_info = helpers.station_device_info(_Coordinator())
+        forecast_info = helpers.forecast_device_info(_Coordinator())
+        ecmwf_info = helpers.ecmwf_epsgram_device_info(_Coordinator())
+
+        self.assertEqual(
+            ecmwf_info["identifiers"],
+            {("shmu", "entry-123_ecmwf_epsgram")},
+        )
+        self.assertNotEqual(ecmwf_info["identifiers"], station_info["identifiers"])
+        self.assertNotEqual(ecmwf_info["identifiers"], forecast_info["identifiers"])
+        self.assertEqual(ecmwf_info["via_device"], ("shmu", "entry-123"))
+        self.assertEqual(ecmwf_info["model"], "ECMWF ENS EPSGRAM Forecast Cache")
+        self.assertEqual(
+            ecmwf_info["configuration_url"],
+            "https://www.shmu.sk/sk/?page=2673",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
