@@ -5,11 +5,11 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 import logging
 from datetime import datetime, timedelta, timezone
-from .cache_paths import forecast_cache_path_for_entry
+from .cache_paths import ecmwf_epsgram_cache_path_for_entry, forecast_cache_path_for_entry
 from .const import CONF_FORECAST_SOURCE, DOMAIN
 from .api import SHMUAPI
 from .forecast import ForecastCache
-from .forecast_jobs import forecast_cache_update_job
+from .forecast_jobs import ecmwf_epsgram_cache_update_job, forecast_cache_update_job
 from .services import async_setup_services, async_unload_services
 
 _LOGGER = logging.getLogger(__name__)
@@ -49,6 +49,8 @@ class SHMUDataUpdateCoordinator(DataUpdateCoordinator):
         self._api = SHMUAPI(self._station_id, self._verify_ssl)
         self.forecast_rows = []
         self.forecast_cache_info = {}
+        self.ecmwf_forecast_rows = []
+        self.ecmwf_cache_info = {}
         entry.async_on_unload(
             async_track_time_change(
                 hass,
@@ -105,6 +107,35 @@ class SHMUDataUpdateCoordinator(DataUpdateCoordinator):
         if result["changed"]:
             _LOGGER.debug("Refreshed SHMU forecast cache: %s", result["info"])
         return result
+
+    async def _async_refresh_ecmwf_epsgram_cache(self, station_id: str | None = None):
+        """Refresh the separate ECMWF EPSGRAM cache on explicit request."""
+        selected_station_id = station_id or self._default_epsgram_station_id()
+        cache_path = ecmwf_epsgram_cache_path_for_entry(self._hass, self._entry)
+        update_job = ecmwf_epsgram_cache_update_job(
+            cache_path,
+            station_id=selected_station_id,
+        )
+
+        try:
+            result = await self._hass.async_add_executor_job(update_job)
+            self.ecmwf_forecast_rows = await self._hass.async_add_executor_job(
+                ForecastCache(cache_path).load
+            )
+            self.ecmwf_cache_info = result["info"]
+        except Exception as err:
+            _LOGGER.warning("Unable to refresh SHMU ECMWF EPSGRAM cache: %s", err)
+            return None
+
+        if result["changed"]:
+            _LOGGER.debug("Refreshed SHMU ECMWF EPSGRAM cache: %s", result["info"])
+        return {**result, "station_id": selected_station_id}
+
+    def _default_epsgram_station_id(self) -> str:
+        """Return the configured EPSGRAM-like station id for manual ECMWF refresh."""
+        if self._meteogram_id and self._meteogram_id != "none":
+            return self._meteogram_id
+        return self._station_id
 
     @callback
     def _handle_midnight_forecast_refresh(self, now) -> None:

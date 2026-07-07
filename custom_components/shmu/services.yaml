@@ -75,3 +75,14 @@ refresh_forecast_cache:
       example: "01J..."
       selector:
         text: {}
+
+refresh_ecmwf_epsgram_cache:
+  fields:
+    entry_id:
+      example: "01J..."
+      selector:
+        text: {}
+    station_id:
+      example: "31396"
+      selector:
+        text: {}
