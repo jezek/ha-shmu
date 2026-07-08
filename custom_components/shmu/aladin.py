@@ -277,15 +277,15 @@ def forecast_payload_from_grib_leads(
     values: list[dict[str, Any]] = []
     for lead_hours, data in grib_leads:
         messages = tuple(iter_grib2_messages(data))
-        temperature_k = _required_value(
+        temperature_k = _optional_value(
             messages,
             selector=TEMPERATURE_2M_SELECTOR,
             forecast_time=lead_hours,
             latitude=latitude,
             longitude=longitude,
-            label="2 m temperature",
-            lead_hours=lead_hours,
         )
+        if temperature_k is None:
+            continue
         wind_u = _optional_value(
             messages,
             selector=WIND_U_10M_SELECTOR,
@@ -341,6 +341,9 @@ def forecast_payload_from_grib_leads(
                 "precipitation_amount": precipitation_amount,
             }
         )
+
+    if not values:
+        raise ValueError("no usable ALADIN forecast leads contained 2 m temperature fields")
 
     return forecast_payload(
         model_run_time=model_run_time,

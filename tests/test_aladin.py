@@ -364,6 +364,39 @@ class TestAladin(unittest.TestCase):
         self.assertEqual(rows[0].precipitation_amount, 2.5)
         self.assertEqual(rows[0].cloud_cover, 42.0)
 
+    def test_forecast_payload_from_grib_leads_skips_leads_without_temperature(self):
+        aladin = _load_module("aladin")
+        forecast = _load_module("forecast")
+        lead_0_without_temperature = _field_message(0, 2, 2, 103, 10, 0, 3.0)
+        lead_1 = _temperature_message(1, 294.655)
+
+        payload = aladin.forecast_payload_from_grib_leads(
+            model_run_time=datetime(2026, 6, 13, 12, tzinfo=timezone.utc),
+            source_url="https://opendata.shmu.sk/run/",
+            source_run_id="aladin-20260613-1200",
+            latitude=47.74175,
+            longitude=16.849607,
+            grib_leads=[(0, lead_0_without_temperature), (1, lead_1)],
+        )
+        rows = forecast.parse_helper_forecast(payload)
+
+        self.assertEqual([row.lead_hours for row in rows], [1])
+        self.assertEqual(rows[0].temperature, 21.505)
+
+    def test_forecast_payload_from_grib_leads_rejects_all_missing_temperature(self):
+        aladin = _load_module("aladin")
+        lead_without_temperature = _field_message(0, 2, 2, 103, 10, 0, 3.0)
+
+        with self.assertRaisesRegex(ValueError, "no usable ALADIN forecast leads"):
+            aladin.forecast_payload_from_grib_leads(
+                model_run_time=datetime(2026, 6, 13, 12, tzinfo=timezone.utc),
+                source_url="https://opendata.shmu.sk/run/",
+                source_run_id="aladin-20260613-1200",
+                latitude=47.74175,
+                longitude=16.849607,
+                grib_leads=[(0, lead_without_temperature)],
+            )
+
     def test_temperature_payload_rejects_naive_model_run_time(self):
         aladin = _load_module("aladin")
 
