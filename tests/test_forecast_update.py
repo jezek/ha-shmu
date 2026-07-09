@@ -245,7 +245,7 @@ class TestForecastUpdate(unittest.TestCase):
                 opener=opener,
             )
 
-        self.assertEqual(calls, list(range(49)))
+        self.assertEqual(calls, list(range(73)))
 
     def test_update_forecast_cache_aladin_temperature_skips_unchanged_run(self):
         forecast_update = _load_forecast_update()

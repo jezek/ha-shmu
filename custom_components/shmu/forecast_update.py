@@ -21,7 +21,7 @@ from .aladin import (
 from .epsgram import ecmwf_helper_payload, latest_station_product, product_json_url
 from .forecast import ForecastCache, parse_helper_forecast
 
-DEFAULT_ALADIN_TEMPERATURE_LEAD_HOURS = tuple(range(49))
+DEFAULT_ALADIN_TEMPERATURE_LEAD_HOURS = tuple(range(73))
 FORECAST_CACHE_USER_AGENT = "ha-shmu-forecast-cache/1.0"
 SHMU_EPSGRAM_STATION_PRODUCTS_URL = (
     "https://www.shmu.sk/api/v1/nwp/getstationproducts?station={station_id}"
