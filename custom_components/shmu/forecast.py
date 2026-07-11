@@ -175,6 +175,8 @@ def rows_as_daily_forecast(rows: list[ForecastRow]) -> list[dict[str, Any]]:
 
     forecasts: list[dict[str, Any]] = []
     for day_key, day_rows in days.items():
+        if not _has_full_day_coverage(day_rows):
+            continue
         temperatures = [row.temperature for row in day_rows if row.temperature is not None]
         precipitation = [
             row.precipitation_amount
@@ -415,7 +417,10 @@ def _row_as_weather_forecast(row: ForecastRow) -> dict[str, Any]:
 
 
 def _condition_for_row(row: ForecastRow) -> str:
-    if row.precipitation_amount is not None and row.precipitation_amount > 0:
+    if (
+        row.precipitation_amount is not None
+        and row.precipitation_amount >= PRECIPITATION_THRESHOLD_MM
+    ):
         return "rainy"
     if row.cloud_cover is None:
         return "cloudy"
@@ -431,6 +436,11 @@ def _dominant_condition(conditions: list[str]) -> str:
         if condition in conditions:
             return condition
     return "cloudy"
+
+
+def _has_full_day_coverage(rows: list[ForecastRow]) -> bool:
+    hours = {row.valid_time.hour for row in rows}
+    return min(hours, default=24) == 0 and max(hours, default=-1) == 23
 
 
 def _required(payload: dict[str, Any], key: str) -> Any:

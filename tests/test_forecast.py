@@ -1,7 +1,7 @@
 import importlib.util
 import os
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 import tempfile
 import unittest
@@ -177,21 +177,19 @@ class TestForecastHelperContract(unittest.TestCase):
                 "source_run_id": "run",
                 "rows": [
                     {
-                        "valid_time": "2026-06-03T01:00:00Z",
-                        "temperature": 12,
-                        "wind_speed": 2,
-                        "wind_gust": 4,
-                        "cloud_cover": 10,
-                        "precipitation_amount": 0,
-                    },
-                    {
-                        "valid_time": "2026-06-03T15:00:00Z",
-                        "temperature": 21,
-                        "wind_speed": 6,
-                        "wind_gust": 9,
-                        "cloud_cover": 80,
-                        "precipitation_amount": 1.5,
-                    },
+                        "valid_time": (
+                            datetime(2026, 6, 3, tzinfo=timezone.utc)
+                            + timedelta(hours=hour)
+                        )
+                        .isoformat()
+                        .replace("+00:00", "Z"),
+                        "temperature": 12 if hour == 1 else 21 if hour == 15 else 16,
+                        "wind_speed": 2 if hour == 1 else 6 if hour == 15 else 3,
+                        "wind_gust": 4 if hour == 1 else 9 if hour == 15 else 5,
+                        "cloud_cover": 10 if hour == 1 else 80 if hour == 15 else 45,
+                        "precipitation_amount": 1.5 if hour == 15 else 0,
+                    }
+                    for hour in range(24)
                 ],
             }
         )
@@ -207,6 +205,63 @@ class TestForecastHelperContract(unittest.TestCase):
         self.assertEqual(daily[0]["wind_speed"], 6.0)
         self.assertEqual(daily[0]["wind_gust_speed"], 9.0)
         self.assertEqual(daily[0]["cloud_coverage"], 45.0)
+
+    def test_rows_as_daily_forecast_skips_incomplete_boundary_days(self):
+        rows = forecast.parse_helper_forecast(
+            {
+                "model_run_time": "2026-06-03T18:00:00Z",
+                "source_url": "https://example.test/aladin.json",
+                "source_run_id": "run",
+                "rows": [
+                    {
+                        "valid_time": (
+                            datetime(2026, 6, 3, 18, tzinfo=timezone.utc)
+                            + timedelta(hours=hour)
+                        )
+                        .isoformat()
+                        .replace("+00:00", "Z"),
+                        "temperature": 16 + hour,
+                        "cloud_cover": 40,
+                    }
+                    for hour in range(30)
+                ],
+            }
+        )
+
+        daily = forecast.rows_as_daily_forecast(rows)
+
+        self.assertEqual(len(daily), 1)
+        self.assertEqual(daily[0]["datetime"], "2026-06-04")
+        self.assertEqual(daily[0]["temperature"], 45.0)
+        self.assertEqual(daily[0]["templow"], 22.0)
+
+    def test_rows_as_daily_forecast_ignores_trace_precipitation_for_condition(self):
+        rows = forecast.parse_helper_forecast(
+            {
+                "model_run_time": "2026-06-03T00:00:00Z",
+                "source_url": "https://example.test/aladin.json",
+                "source_run_id": "run",
+                "rows": [
+                    {
+                        "valid_time": (
+                            datetime(2026, 6, 3, tzinfo=timezone.utc)
+                            + timedelta(hours=hour)
+                        )
+                        .isoformat()
+                        .replace("+00:00", "Z"),
+                        "temperature": 16,
+                        "cloud_cover": 15,
+                        "precipitation_amount": 0.01,
+                    }
+                    for hour in range(24)
+                ],
+            }
+        )
+
+        daily = forecast.rows_as_daily_forecast(rows)
+
+        self.assertEqual(daily[0]["condition"], "sunny")
+        self.assertEqual(daily[0]["precipitation"], 0.24)
 
     def test_forecast_summary_answers_practical_questions(self):
         rows = forecast.parse_helper_forecast(
