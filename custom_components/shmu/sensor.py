@@ -1,5 +1,6 @@
 from homeassistant.components.sensor import SensorEntity, SensorDeviceClass, SensorStateClass
 from homeassistant.const import PERCENTAGE
+from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from datetime import datetime, timedelta
 from .cache_paths import forecast_cache_path_for_entry
@@ -159,6 +160,8 @@ class SHMUForecastSummarySensor(CoordinatorEntity, SensorEntity):
 
 class SHMUForecastCacheInfoSensor(CoordinatorEntity, SensorEntity):
     """Forecast cache freshness sensor backed by helper/cache metadata."""
+
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
 
     def __init__(
         self,

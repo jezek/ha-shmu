@@ -1,4 +1,5 @@
 import importlib.util
+from io import BytesIO
 import json
 import os
 from pathlib import Path
@@ -8,6 +9,7 @@ import tempfile
 import types
 import unittest
 from datetime import datetime, timezone
+from urllib.error import HTTPError
 
 
 MODULE_PATH = (
@@ -246,6 +248,50 @@ class TestForecastUpdate(unittest.TestCase):
             )
 
         self.assertEqual(calls, list(range(79)))
+
+    def test_update_forecast_cache_aladin_temperature_accepts_shorter_published_range(self):
+        forecast_update = _load_forecast_update()
+        calls = []
+
+        def opener(request, timeout):
+            lead = int(request.full_url.split("al-grib_sk_")[1].split("-", 1)[0])
+            calls.append(lead)
+            if lead == 2:
+                raise HTTPError(request.full_url, 404, "Not Found", {}, BytesIO())
+            return _Response(_temperature_message(lead, 294.655 + lead))
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            cache_path = Path(temp_dir) / "forecast-cache.json"
+            forecast_update.update_forecast_cache_aladin_temperature(
+                cache_path,
+                model_run_time=datetime(2026, 6, 13, 12, tzinfo=timezone.utc),
+                latitude=47.74175,
+                longitude=16.849607,
+                opener=opener,
+            )
+            written = json.loads(cache_path.read_text(encoding="utf-8"))
+
+        self.assertEqual(calls, [0, 1, 2])
+        self.assertEqual([row["lead_hours"] for row in written["rows"]], [0, 1])
+
+    def test_update_forecast_cache_aladin_temperature_rejects_unpublished_run(self):
+        forecast_update = _load_forecast_update()
+
+        def opener(request, timeout):
+            raise HTTPError(request.full_url, 404, "Not Found", {}, BytesIO())
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            cache_path = Path(temp_dir) / "forecast-cache.json"
+            with self.assertRaises(HTTPError) as raised:
+                forecast_update.update_forecast_cache_aladin_temperature(
+                    cache_path,
+                    model_run_time=datetime(2026, 6, 13, 12, tzinfo=timezone.utc),
+                    latitude=47.74175,
+                    longitude=16.849607,
+                    opener=opener,
+                )
+            raised.exception.close()
+            self.assertFalse(cache_path.exists())
 
     def test_update_forecast_cache_aladin_temperature_skips_unchanged_run(self):
         forecast_update = _load_forecast_update()

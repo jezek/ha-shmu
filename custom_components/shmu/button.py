@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from homeassistant.components.button import ButtonEntity
 from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
@@ -15,6 +16,7 @@ class SHMUForecastRefreshButton(CoordinatorEntity, ButtonEntity):
 
     _attr_has_entity_name = True
     _attr_name = "Refresh forecast cache"
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
 
     def __init__(self, coordinator):
         """Initialize the ALADIN forecast refresh button."""
@@ -37,6 +39,7 @@ class SHMUECMWFEPSGRAMRefreshButton(CoordinatorEntity, ButtonEntity):
 
     _attr_has_entity_name = True
     _attr_name = "Refresh ECMWF EPSGRAM cache"
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
 
     def __init__(self, coordinator):
         """Initialize the ECMWF EPSGRAM refresh button."""

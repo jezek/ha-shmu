@@ -1,10 +1,12 @@
 import importlib.util
 from datetime import datetime, timedelta, timezone
+from io import BytesIO
 from pathlib import Path
 import struct
 import sys
 import types
 import unittest
+from urllib.error import HTTPError
 
 
 COMPONENT_DIR = Path(__file__).resolve().parents[1] / "custom_components" / "shmu"
@@ -292,6 +294,24 @@ class TestAladin(unittest.TestCase):
             [url.split("al-grib_sk_")[1].split("-", 1)[0] for url, _ in calls],
             ["000", "003", "007"],
         )
+
+    def test_download_grib_leads_can_stop_at_unpublished_trailing_lead(self):
+        aladin = _load_module("aladin")
+
+        def opener(request, timeout):
+            lead = int(request.full_url.split("al-grib_sk_")[1].split("-", 1)[0])
+            if lead == 2:
+                raise HTTPError(request.full_url, 404, "Not Found", {}, BytesIO())
+            return _Response(f"lead-{lead:03d}".encode())
+
+        leads = aladin.download_grib_leads(
+            datetime(2026, 6, 13, 12, tzinfo=timezone.utc),
+            range(4),
+            opener=opener,
+            stop_at_first_not_found=True,
+        )
+
+        self.assertEqual(leads, [(0, b"lead-000"), (1, b"lead-001")])
 
     def test_temperature_payload_is_forecast_cache_compatible(self):
         aladin = _load_module("aladin")

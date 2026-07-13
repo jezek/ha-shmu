@@ -96,6 +96,7 @@ def update_forecast_cache_aladin_temperature(
             else lead_hours,
             timeout=timeout,
             opener=selected_opener,
+            stop_at_first_not_found=lead_hours is None,
         ),
     )
     return update_forecast_cache_payload(cache_path, payload)

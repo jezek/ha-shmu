@@ -7,6 +7,7 @@ from collections.abc import Iterable
 from datetime import datetime, timedelta, timezone
 import math
 from typing import Any
+from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 from .grib import decode_nearest_lambert_value, find_product_message, iter_grib2_messages
@@ -155,17 +156,26 @@ def download_grib_leads(
     *,
     timeout: int = 30,
     opener=urlopen,
+    stop_at_first_not_found: bool = False,
 ) -> list[tuple[int, bytes]]:
     """Download multiple SHMU OpenData ALADIN GRIB lead files."""
-    return [
-        download_grib_lead(
-            model_run_time,
-            lead,
-            timeout=timeout,
-            opener=opener,
-        )
-        for lead in lead_hours
-    ]
+    downloaded = []
+    for lead in lead_hours:
+        try:
+            downloaded.append(
+                download_grib_lead(
+                    model_run_time,
+                    lead,
+                    timeout=timeout,
+                    opener=opener,
+                )
+            )
+        except HTTPError as err:
+            if stop_at_first_not_found and err.code == 404 and downloaded:
+                err.close()
+                break
+            raise
+    return downloaded
 
 
 def temperature_payload(

@@ -3,6 +3,7 @@ from pathlib import Path
 import sys
 import types
 import unittest
+from enum import Enum
 
 
 MODULE_PATH = Path(__file__).resolve().parents[1] / "custom_components" / "shmu" / "button.py"
@@ -27,9 +28,13 @@ def _install_homeassistant_stubs():
         def __init__(self, coordinator):
             self.coordinator = coordinator
 
+    class EntityCategory(Enum):
+        DIAGNOSTIC = "diagnostic"
+
     button.ButtonEntity = ButtonEntity
     exceptions.HomeAssistantError = HomeAssistantError
     entity.DeviceInfo = lambda **kwargs: kwargs
+    entity.EntityCategory = EntityCategory
     update_coordinator.CoordinatorEntity = CoordinatorEntity
 
     sys.modules.setdefault("homeassistant", homeassistant)
@@ -105,6 +110,7 @@ class TestRefreshButtons(unittest.IsolatedAsyncioTestCase):
             "shmu_entry-123_refresh_forecast_cache",
         )
         self.assertEqual(entity._attr_device_info["identifiers"], {("shmu", "entry-123_forecast")})
+        self.assertEqual(entity._attr_entity_category.value, "diagnostic")
         self.assertEqual(coordinator.forecast_calls, 1)
         self.assertEqual(coordinator.listener_updates, 1)
 
