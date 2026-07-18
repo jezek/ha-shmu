@@ -174,8 +174,11 @@ def rows_as_daily_forecast(rows: list[ForecastRow]) -> list[dict[str, Any]]:
         days.setdefault(day_key, []).append(row)
 
     forecasts: list[dict[str, Any]] = []
+    last_day_key = next(reversed(days), None)
     for day_key, day_rows in days.items():
-        if not _has_full_day_coverage(day_rows):
+        if not _has_full_day_coverage(day_rows) and not (
+            day_key == last_day_key and _has_usable_trailing_day_coverage(day_rows)
+        ):
             continue
         temperatures = [row.temperature for row in day_rows if row.temperature is not None]
         precipitation = [
@@ -188,7 +191,10 @@ def rows_as_daily_forecast(rows: list[ForecastRow]) -> list[dict[str, Any]]:
         cloud_cover = [row.cloud_cover for row in day_rows if row.cloud_cover is not None]
         conditions = [_condition_for_row(row) for row in day_rows]
 
-        forecast: dict[str, Any] = {"datetime": day_key, "condition": _dominant_condition(conditions)}
+        forecast: dict[str, Any] = {
+            "datetime": f"{day_key}T12:00:00Z",
+            "condition": _dominant_condition(conditions),
+        }
         if temperatures:
             forecast["temperature"] = max(temperatures)
             forecast["templow"] = min(temperatures)
@@ -441,6 +447,12 @@ def _dominant_condition(conditions: list[str]) -> str:
 def _has_full_day_coverage(rows: list[ForecastRow]) -> bool:
     hours = {row.valid_time.hour for row in rows}
     return min(hours, default=24) == 0 and max(hours, default=-1) == 23
+
+
+def _has_usable_trailing_day_coverage(rows: list[ForecastRow]) -> bool:
+    """Allow a final partial day when it contains midnight through noon."""
+    hours = {row.valid_time.hour for row in rows}
+    return min(hours, default=24) == 0 and max(hours, default=-1) >= 12
 
 
 def _required(payload: dict[str, Any], key: str) -> Any:
