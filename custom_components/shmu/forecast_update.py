@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import json
 from collections.abc import Iterable
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
+from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 from .aladin import (
@@ -113,17 +114,31 @@ def update_forecast_cache_latest_aladin_temperature(
     verify_ssl: bool = True,
     opener=None,
 ) -> dict[str, Any]:
-    """Update the cache from the latest ALADIN run that should be available."""
-    return update_forecast_cache_aladin_temperature(
-        cache_path,
-        model_run_time=latest_model_run_time(now),
-        latitude=latitude,
-        longitude=longitude,
-        lead_hours=lead_hours,
-        timeout=timeout,
-        verify_ssl=verify_ssl,
-        opener=opener,
-    )
+    """Update from the newest published ALADIN run, falling back on HTTP 404."""
+    candidate_before = now
+    for _ in range(5):
+        model_run_time = latest_model_run_time(
+            candidate_before,
+            availability_lag=timedelta(0),
+        )
+        try:
+            return update_forecast_cache_aladin_temperature(
+                cache_path,
+                model_run_time=model_run_time,
+                latitude=latitude,
+                longitude=longitude,
+                lead_hours=lead_hours,
+                timeout=timeout,
+                verify_ssl=verify_ssl,
+                opener=opener,
+            )
+        except HTTPError as err:
+            if err.code != 404:
+                raise
+            err.close()
+            candidate_before = model_run_time - timedelta(seconds=1)
+
+    raise FileNotFoundError("no published ALADIN run found in the latest candidates")
 
 
 def update_forecast_cache_latest_ecmwf_epsgram(

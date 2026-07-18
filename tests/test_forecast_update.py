@@ -327,6 +327,8 @@ class TestForecastUpdate(unittest.TestCase):
 
         def opener(request, timeout):
             calls.append(request.full_url)
+            if "/1800/" in request.full_url:
+                raise HTTPError(request.full_url, 404, "Not Found", {}, BytesIO())
             return _Response(_temperature_message(0, 294.655))
 
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -344,7 +346,37 @@ class TestForecastUpdate(unittest.TestCase):
 
         self.assertTrue(result["changed"])
         self.assertEqual(written["source_run_id"], "aladin-sk-4.5km-20260616-1200")
-        self.assertIn("/20260616/1200/al-grib_sk_000-20260616-1200-", calls[0])
+        self.assertIn("/20260616/1800/al-grib_sk_000-20260616-1800-", calls[0])
+        self.assertIn("/20260616/1200/al-grib_sk_000-20260616-1200-", calls[1])
+
+    def test_update_forecast_cache_latest_aladin_temperature_adopts_12utc_at_1921_cest(self):
+        forecast_update = _load_forecast_update()
+        calls = []
+
+        def opener(request, timeout):
+            calls.append(request.full_url)
+            return _Response(_temperature_message(0, 294.655))
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            cache_path = Path(temp_dir) / "forecast-cache.json"
+            forecast_update.update_forecast_cache_payload(
+                cache_path,
+                _payload("aladin-sk-4.5km-20260713-0600"),
+            )
+
+            result = forecast_update.update_forecast_cache_latest_aladin_temperature(
+                cache_path,
+                now=datetime(2026, 7, 13, 17, 21, tzinfo=timezone.utc),
+                latitude=48.289,
+                longitude=17.267,
+                lead_hours=[0],
+                opener=opener,
+            )
+            written = json.loads(cache_path.read_text(encoding="utf-8"))
+
+        self.assertTrue(result["changed"])
+        self.assertEqual(written["source_run_id"], "aladin-sk-4.5km-20260713-1200")
+        self.assertIn("/20260713/1200/al-grib_sk_000-20260713-1200-", calls[0])
 
     def test_update_forecast_cache_latest_ecmwf_epsgram_writes_cache(self):
         forecast_update = _load_forecast_update()
