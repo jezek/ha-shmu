@@ -211,6 +211,17 @@ class TestAladin(unittest.TestCase):
             datetime(2026, 6, 16, 12, tzinfo=timezone.utc),
         )
 
+    def test_latest_model_run_time_reproduces_20260713_stale_run_window(self):
+        """Document why the fixed six-hour lag retained 06 UTC at 19:21 CEST."""
+        aladin = _load_module("aladin")
+
+        self.assertEqual(
+            aladin.latest_model_run_time(
+                datetime(2026, 7, 13, 17, 21, tzinfo=timezone.utc)
+            ),
+            datetime(2026, 7, 13, 6, tzinfo=timezone.utc),
+        )
+
     def test_grib_url_rejects_negative_lead_hours(self):
         aladin = _load_module("aladin")
 
