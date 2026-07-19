@@ -158,7 +158,10 @@ class TestForecastHelperContract(unittest.TestCase):
             }
         )
 
-        hourly = forecast.rows_as_hourly_forecast(rows)
+        hourly = forecast.rows_as_hourly_forecast(
+            rows,
+            datetime(2026, 6, 3, 0, 30, tzinfo=timezone.utc),
+        )
 
         self.assertEqual(hourly[0]["datetime"], "2026-06-03T01:00:00Z")
         self.assertEqual(hourly[0]["condition"], "rainy")
@@ -168,6 +171,50 @@ class TestForecastHelperContract(unittest.TestCase):
         self.assertEqual(hourly[0]["wind_gust_speed"], 5.0)
         self.assertEqual(hourly[0]["precipitation"], 0.3)
         self.assertEqual(hourly[1]["condition"], "cloudy")
+
+    def test_rows_as_hourly_forecast_starts_at_upcoming_full_hour(self):
+        rows = forecast.parse_helper_forecast(
+            {
+                "model_run_time": "2026-07-19T12:00:00Z",
+                "source_url": "https://example.test/aladin.json",
+                "source_run_id": "run",
+                "rows": [
+                    {
+                        "valid_time": f"2026-07-19T{hour:02d}:00:00Z",
+                        "temperature": 10 + hour,
+                    }
+                    for hour in range(12, 22)
+                ],
+            }
+        )
+
+        hourly = forecast.rows_as_hourly_forecast(
+            rows,
+            datetime(2026, 7, 19, 16, 2, tzinfo=timezone.utc),
+        )
+
+        self.assertEqual(hourly[0]["datetime"], "2026-07-19T17:00:00Z")
+        self.assertEqual(len(hourly), 5)
+
+    def test_rows_as_hourly_forecast_keeps_exact_full_hour(self):
+        rows = forecast.parse_helper_forecast(
+            {
+                "model_run_time": "2026-07-19T12:00:00Z",
+                "source_url": "https://example.test/aladin.json",
+                "source_run_id": "run",
+                "rows": [
+                    {"valid_time": "2026-07-19T17:00:00Z", "temperature": 20},
+                    {"valid_time": "2026-07-19T18:00:00Z", "temperature": 21},
+                ],
+            }
+        )
+
+        hourly = forecast.rows_as_hourly_forecast(
+            rows,
+            datetime(2026, 7, 19, 17, tzinfo=timezone.utc),
+        )
+
+        self.assertEqual(hourly[0]["datetime"], "2026-07-19T17:00:00Z")
 
     def test_rows_as_daily_forecast_aggregates_weather_fields(self):
         rows = forecast.parse_helper_forecast(
@@ -235,7 +282,7 @@ class TestForecastHelperContract(unittest.TestCase):
         self.assertEqual(daily[0]["temperature"], 45.0)
         self.assertEqual(daily[0]["templow"], 22.0)
 
-    def test_rows_as_daily_forecast_keeps_usable_trailing_half_day(self):
+    def test_rows_as_daily_forecast_excludes_incomplete_trailing_half_day(self):
         rows = forecast.parse_helper_forecast(
             {
                 "model_run_time": "2026-07-18T12:00:00Z",
@@ -264,11 +311,10 @@ class TestForecastHelperContract(unittest.TestCase):
             [
                 "2026-07-19T12:00:00Z",
                 "2026-07-20T12:00:00Z",
-                "2026-07-21T12:00:00Z",
             ],
         )
-        self.assertEqual(daily[-1]["templow"], 70.0)
-        self.assertEqual(daily[-1]["temperature"], 82.0)
+        self.assertEqual(daily[-1]["templow"], 46.0)
+        self.assertEqual(daily[-1]["temperature"], 69.0)
 
     def test_rows_as_daily_forecast_ignores_trace_precipitation_for_condition(self):
         rows = forecast.parse_helper_forecast(
