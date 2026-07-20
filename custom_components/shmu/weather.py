@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
+from datetime import datetime, timezone
 
 from homeassistant.components.weather import WeatherEntity, WeatherEntityFeature
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -77,7 +78,11 @@ class SHMUWeather(CoordinatorEntity, WeatherEntity):
     async def async_forecast_daily(self):
         """Return cached daily forecast aggregates."""
         rows = await self.hass.async_add_executor_job(self._load_rows)
-        return rows_as_daily_forecast(rows)
+        return rows_as_daily_forecast(
+            rows,
+            self.coordinator.forecast_historical_temperatures,
+            datetime.now(timezone.utc),
+        )
 
     def _load_rows(self):
         if self._cache is None:

@@ -50,6 +50,7 @@ class SHMUDataUpdateCoordinator(DataUpdateCoordinator):
         self._verify_ssl = entry.data.get("verify_ssl", True)
         self._api = SHMUAPI(self._station_id, self._verify_ssl)
         self.forecast_rows = []
+        self.forecast_historical_temperatures = {}
         self.forecast_cache_info = {}
         self.ecmwf_forecast_rows = []
         self.ecmwf_cache_info = {}
@@ -102,6 +103,7 @@ class SHMUDataUpdateCoordinator(DataUpdateCoordinator):
                 ForecastCache(cache_path).load
             )
             self.forecast_cache_info = result["info"]
+            await self._async_refresh_forecast_history()
         except Exception as err:
             _LOGGER.warning("Unable to refresh SHMU forecast cache: %s", err)
             return None
@@ -109,6 +111,26 @@ class SHMUDataUpdateCoordinator(DataUpdateCoordinator):
         if result["changed"]:
             _LOGGER.debug("Refreshed SHMU forecast cache: %s", result["info"])
         return result
+
+    async def _async_refresh_forecast_history(self) -> None:
+        """Load only history needed to complete today's leading forecast boundary."""
+        self.forecast_historical_temperatures = {}
+        if not self.forecast_rows:
+            return
+        first_valid_time = min(row.valid_time for row in self.forecast_rows)
+        now = datetime.now(timezone.utc)
+        if first_valid_time.date() != now.date() or first_valid_time.hour == 0:
+            return
+        day_start = first_valid_time.replace(hour=0, minute=0, second=0, microsecond=0)
+        session = async_get_clientsession(self._hass)
+        try:
+            self.forecast_historical_temperatures = await self._api.fetch_temperature_history(
+                session,
+                day_start,
+                first_valid_time,
+            )
+        except Exception as err:
+            _LOGGER.warning("Unable to complete current SHMU forecast day: %s", err)
 
     async def _async_refresh_ecmwf_epsgram_cache(self, station_id: str | None = None):
         """Refresh the separate ECMWF EPSGRAM cache on explicit request."""
