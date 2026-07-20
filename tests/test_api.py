@@ -1,4 +1,5 @@
 import importlib.util
+from datetime import datetime, timezone
 from pathlib import Path
 import sys
 import types
@@ -86,6 +87,16 @@ class _Session:
         return self._response
 
 
+class _SequenceSession:
+    def __init__(self, responses):
+        self._responses = iter(responses)
+        self.calls = []
+
+    def get(self, url, **kwargs):
+        self.calls.append((url, kwargs))
+        return next(self._responses)
+
+
 class TestSHMUAPI(unittest.IsolatedAsyncioTestCase):
     async def test_fetch_data_uses_supplied_session(self):
         api_module = _load_api()
@@ -128,6 +139,46 @@ class TestSHMUAPI(unittest.IsolatedAsyncioTestCase):
 
         with self.assertRaisesRegex(Exception, "HTTP 404"):
             await api.fetch_data(session)
+
+    async def test_fetch_temperature_history_uses_payload_utc_hours(self):
+        api_module = _load_api()
+        api = api_module.SHMUAPI("11813", verify_ssl=False)
+        session = _SequenceSession(
+            [
+                _Response(
+                    payload={
+                        "data": [
+                            {"ind_kli": 11813, "minuta": "2026-07-19T09:50:00", "t": 20},
+                            {"ind_kli": 11813, "minuta": "2026-07-19T09:59:00", "t": 21},
+                        ]
+                    }
+                ),
+                _Response(
+                    payload={
+                        "data": [
+                            {"ind_kli": 11813, "minuta": "2026-07-19T10:59:00", "t": 22}
+                        ]
+                    }
+                ),
+            ]
+        )
+
+        result = await api.fetch_temperature_history(
+            session,
+            datetime(2026, 7, 19, 9, tzinfo=timezone.utc),
+            datetime(2026, 7, 19, 11, tzinfo=timezone.utc),
+        )
+
+        self.assertEqual(
+            result,
+            {
+                datetime(2026, 7, 19, 9, tzinfo=timezone.utc): 21.0,
+                datetime(2026, 7, 19, 10, tzinfo=timezone.utc): 22.0,
+            },
+        )
+        self.assertIn("2026-07-19 11-00-00.json", session.calls[0][0])
+        self.assertIn("2026-07-19 12-00-00.json", session.calls[1][0])
+        self.assertEqual([kwargs for _, kwargs in session.calls], [{"ssl": False}] * 2)
 
 
 if __name__ == "__main__":
