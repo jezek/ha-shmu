@@ -282,6 +282,54 @@ class TestForecastHelperContract(unittest.TestCase):
         self.assertEqual(daily[0]["temperature"], 45.0)
         self.assertEqual(daily[0]["templow"], 22.0)
 
+    def test_rows_as_daily_forecast_completes_current_day_with_history(self):
+        day = datetime(2026, 7, 19, tzinfo=timezone.utc)
+        rows = forecast.parse_helper_forecast(
+            {
+                "model_run_time": "2026-07-19T12:00:00Z",
+                "source_url": "https://example.test/aladin.json",
+                "source_run_id": "run",
+                "rows": [
+                    {
+                        "valid_time": (day + timedelta(hours=hour)).isoformat(),
+                        "temperature": 20 + hour,
+                        "precipitation_amount": 1 if hour == 15 else 0,
+                    }
+                    for hour in range(12, 24)
+                ],
+            }
+        )
+        history = {day + timedelta(hours=hour): 5 + hour for hour in range(12)}
+
+        daily = forecast.rows_as_daily_forecast(rows, history, day + timedelta(hours=18))
+
+        self.assertEqual(daily[0]["datetime"], "2026-07-19T12:00:00Z")
+        self.assertEqual(daily[0]["templow"], 5.0)
+        self.assertEqual(daily[0]["temperature"], 43.0)
+        self.assertEqual(daily[0]["precipitation"], 1.0)
+
+    def test_rows_as_daily_forecast_rejects_current_day_with_history_gap(self):
+        day = datetime(2026, 7, 19, tzinfo=timezone.utc)
+        rows = forecast.parse_helper_forecast(
+            {
+                "model_run_time": "2026-07-19T12:00:00Z",
+                "source_url": "https://example.test/aladin.json",
+                "source_run_id": "run",
+                "rows": [
+                    {
+                        "valid_time": (day + timedelta(hours=hour)).isoformat(),
+                        "temperature": 20 + hour,
+                    }
+                    for hour in range(12, 24)
+                ],
+            }
+        )
+        history = {day + timedelta(hours=hour): 5 + hour for hour in range(11)}
+
+        daily = forecast.rows_as_daily_forecast(rows, history, day + timedelta(hours=18))
+
+        self.assertEqual(daily, [])
+
     def test_rows_as_daily_forecast_excludes_incomplete_trailing_half_day(self):
         rows = forecast.parse_helper_forecast(
             {

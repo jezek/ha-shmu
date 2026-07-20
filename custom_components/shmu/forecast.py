@@ -175,8 +175,14 @@ def rows_as_hourly_forecast(
     ]
 
 
-def rows_as_daily_forecast(rows: list[ForecastRow]) -> list[dict[str, Any]]:
+def rows_as_daily_forecast(
+    rows: list[ForecastRow],
+    historical_temperatures: dict[datetime, float] | None = None,
+    reference_time: datetime | None = None,
+) -> list[dict[str, Any]]:
     """Aggregate normalized rows into Home Assistant-style daily forecast dicts."""
+    historical_by_day = _historical_temperatures_by_day(historical_temperatures or {})
+    reference_day = reference_time.date().isoformat() if reference_time is not None else None
     days: dict[str, list[ForecastRow]] = {}
     for row in sorted(rows, key=lambda row: row.valid_time):
         day_key = row.valid_time.date().isoformat()
@@ -184,9 +190,16 @@ def rows_as_daily_forecast(rows: list[ForecastRow]) -> list[dict[str, Any]]:
 
     forecasts: list[dict[str, Any]] = []
     for day_key, day_rows in days.items():
-        if not _has_full_day_coverage(day_rows):
+        historical_day = historical_by_day.get(day_key, {}) if day_key == reference_day else {}
+        covered_hours = {row.valid_time.hour for row in day_rows} | set(historical_day)
+        if covered_hours != set(range(24)):
             continue
         temperatures = [row.temperature for row in day_rows if row.temperature is not None]
+        temperatures.extend(
+            temperature
+            for hour, temperature in historical_day.items()
+            if hour not in {row.valid_time.hour for row in day_rows}
+        )
         precipitation = [
             row.precipitation_amount
             for row in day_rows
@@ -453,6 +466,18 @@ def _dominant_condition(conditions: list[str]) -> str:
 def _has_full_day_coverage(rows: list[ForecastRow]) -> bool:
     hours = {row.valid_time.hour for row in rows}
     return min(hours, default=24) == 0 and max(hours, default=-1) == 23
+
+
+def _historical_temperatures_by_day(
+    values: dict[datetime, float],
+) -> dict[str, dict[int, float]]:
+    by_day: dict[str, dict[int, float]] = {}
+    for timestamp, temperature in values.items():
+        timestamp_utc = _as_aware_utc(timestamp)
+        by_day.setdefault(timestamp_utc.date().isoformat(), {})[timestamp_utc.hour] = float(
+            temperature
+        )
+    return by_day
 
 
 def _next_full_hour(value: datetime) -> datetime:
