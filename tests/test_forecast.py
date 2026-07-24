@@ -242,7 +242,7 @@ class TestForecastHelperContract(unittest.TestCase):
         self.assertEqual([item["is_daytime"] for item in hourly], [False, False])
         self.assertEqual(
             [item["condition"] for item in hourly],
-            ["sunny", "partlycloudy"],
+            ["clear-night", "clear-night"],
         )
 
     def test_rows_as_hourly_forecast_passes_utc_times_across_dst_boundary(self):
@@ -272,6 +272,10 @@ class TestForecastHelperContract(unittest.TestCase):
         )
 
         self.assertEqual([item["is_daytime"] for item in hourly], [False, False])
+        self.assertEqual(
+            [item["condition"] for item in hourly],
+            ["clear-night", "clear-night"],
+        )
         self.assertEqual(
             observed,
             [

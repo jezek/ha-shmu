@@ -177,7 +177,10 @@ def rows_as_hourly_forecast(
             continue
         forecast = _row_as_weather_forecast(row)
         if is_daytime_at is not None:
-            forecast["is_daytime"] = is_daytime_at(row.valid_time)
+            is_daytime = is_daytime_at(row.valid_time)
+            forecast["is_daytime"] = is_daytime
+            if not is_daytime and forecast["condition"] in {"sunny", "partlycloudy"}:
+                forecast["condition"] = "clear-night"
         forecasts.append(forecast)
     return forecasts
 
