@@ -76,6 +76,7 @@ class SHMUDataUpdateCoordinator(DataUpdateCoordinator):
             session = async_get_clientsession(self._hass)
             data = await self._api.fetch_data(session)
             await self._async_refresh_forecast_cache()
+            await self._async_refresh_ecmwf_epsgram_cache()
             return data
         except Exception as err:
             raise UpdateFailed(f"Error communicating with SHMU API: {err}")
@@ -169,4 +170,5 @@ class SHMUDataUpdateCoordinator(DataUpdateCoordinator):
     async def _async_midnight_forecast_refresh(self) -> None:
         """Refresh only forecast cache and notify forecast entities."""
         await self._async_refresh_forecast_cache()
+        await self._async_refresh_ecmwf_epsgram_cache()
         self.async_update_listeners()
