@@ -5,6 +5,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 import tempfile
 import unittest
+from zoneinfo import ZoneInfo
 
 
 MODULE_PATH = Path(__file__).resolve().parents[1] / "custom_components" / "shmu" / "forecast.py"
@@ -215,6 +216,69 @@ class TestForecastHelperContract(unittest.TestCase):
         )
 
         self.assertEqual(hourly[0]["datetime"], "2026-07-19T17:00:00Z")
+
+    def test_rows_as_hourly_forecast_adds_daylight_flag(self):
+        rows = forecast.parse_helper_forecast(
+            {
+                "model_run_time": "2026-07-19T12:00:00Z",
+                "source_url": "https://example.test/aladin.json",
+                "source_run_id": "run",
+                "rows": [
+                    {
+                        "valid_time": f"2026-07-19T{hour:02d}:00:00Z",
+                        "cloud_cover": cloud_cover,
+                    }
+                    for hour, cloud_cover in ((21, 10), (22, 50))
+                ],
+            }
+        )
+
+        hourly = forecast.rows_as_hourly_forecast(
+            rows,
+            datetime(2026, 7, 19, 20, tzinfo=timezone.utc),
+            is_daytime_at=lambda valid_time: False,
+        )
+
+        self.assertEqual([item["is_daytime"] for item in hourly], [False, False])
+        self.assertEqual(
+            [item["condition"] for item in hourly],
+            ["sunny", "partlycloudy"],
+        )
+
+    def test_rows_as_hourly_forecast_passes_utc_times_across_dst_boundary(self):
+        bratislava = ZoneInfo("Europe/Bratislava")
+        rows = forecast.parse_helper_forecast(
+            {
+                "model_run_time": "2026-10-24T12:00:00Z",
+                "source_url": "https://example.test/aladin.json",
+                "source_run_id": "run",
+                "rows": [
+                    {"valid_time": "2026-10-25T00:00:00Z", "cloud_cover": 10},
+                    {"valid_time": "2026-10-25T01:00:00Z", "cloud_cover": 10},
+                ],
+            }
+        )
+        observed: list[tuple[datetime, int, int]] = []
+
+        def classify_daylight(valid_time: datetime) -> bool:
+            local_time = valid_time.astimezone(bratislava)
+            observed.append((valid_time, local_time.hour, local_time.fold))
+            return False
+
+        hourly = forecast.rows_as_hourly_forecast(
+            rows,
+            datetime(2026, 10, 24, 23, tzinfo=timezone.utc),
+            is_daytime_at=classify_daylight,
+        )
+
+        self.assertEqual([item["is_daytime"] for item in hourly], [False, False])
+        self.assertEqual(
+            observed,
+            [
+                (datetime(2026, 10, 25, 0, tzinfo=timezone.utc), 2, 0),
+                (datetime(2026, 10, 25, 1, tzinfo=timezone.utc), 2, 1),
+            ],
+        )
 
     def test_rows_as_daily_forecast_aggregates_weather_fields(self):
         rows = forecast.parse_helper_forecast(

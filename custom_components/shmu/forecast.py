@@ -7,6 +7,7 @@ inside the Home Assistant custom component.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 import json
@@ -162,17 +163,23 @@ class ForecastCache:
 
 
 def rows_as_hourly_forecast(
-    rows: list[ForecastRow], reference_time: datetime | None = None
+    rows: list[ForecastRow],
+    reference_time: datetime | None = None,
+    is_daytime_at: Callable[[datetime], bool] | None = None,
 ) -> list[dict[str, Any]]:
     """Convert future rows starting at the nearest upcoming full hour."""
     if reference_time is None:
         reference_time = datetime.now(timezone.utc)
     cutoff = _next_full_hour(_as_aware_utc(reference_time))
-    return [
-        _row_as_weather_forecast(row)
-        for row in sorted(rows, key=lambda row: row.valid_time)
-        if row.valid_time >= cutoff
-    ]
+    forecasts: list[dict[str, Any]] = []
+    for row in sorted(rows, key=lambda row: row.valid_time):
+        if row.valid_time < cutoff:
+            continue
+        forecast = _row_as_weather_forecast(row)
+        if is_daytime_at is not None:
+            forecast["is_daytime"] = is_daytime_at(row.valid_time)
+        forecasts.append(forecast)
+    return forecasts
 
 
 def rows_as_daily_forecast(

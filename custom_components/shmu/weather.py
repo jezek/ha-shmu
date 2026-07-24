@@ -7,6 +7,7 @@ from pathlib import Path
 from datetime import datetime, timezone
 
 from homeassistant.components.weather import WeatherEntity, WeatherEntityFeature
+from homeassistant.helpers.sun import is_up
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .cache_paths import ecmwf_epsgram_cache_path_for_entry, forecast_cache_path_for_entry
@@ -73,7 +74,10 @@ class SHMUWeather(CoordinatorEntity, WeatherEntity):
     async def async_forecast_hourly(self):
         """Return cached hourly forecast rows."""
         rows = await self.hass.async_add_executor_job(self._load_rows)
-        return rows_as_hourly_forecast(rows)
+        return rows_as_hourly_forecast(
+            rows,
+            is_daytime_at=lambda valid_time: is_up(self.hass, valid_time),
+        )
 
     async def async_forecast_daily(self):
         """Return cached daily forecast aggregates."""
@@ -134,7 +138,10 @@ class SHMUECMWFEPSGRAMWeather(CoordinatorEntity, WeatherEntity):
     async def async_forecast_hourly(self):
         """Return cached ECMWF EPSGRAM hourly forecast rows."""
         rows = await self.hass.async_add_executor_job(self._load_rows)
-        return rows_as_hourly_forecast(rows)
+        return rows_as_hourly_forecast(
+            rows,
+            is_daytime_at=lambda valid_time: is_up(self.hass, valid_time),
+        )
 
     async def async_forecast_daily(self):
         """Return cached ECMWF EPSGRAM daily forecast aggregates."""
