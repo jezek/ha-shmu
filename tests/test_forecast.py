@@ -384,6 +384,72 @@ class TestForecastHelperContract(unittest.TestCase):
         self.assertEqual(daily[0]["templow"], 12.0)
         self.assertEqual(daily[0]["temperature"], 33.0)
 
+    def test_current_condition_prefers_observed_rain(self):
+        reference = datetime(2026, 7, 25, 2, 30, tzinfo=timezone.utc)
+        rows = self._condition_rows(reference)
+
+        condition = forecast.current_condition(
+            rows,
+            reference,
+            precipitation_amount=0.2,
+            is_daytime_at=lambda _: False,
+        )
+
+        self.assertEqual(condition, "rainy")
+
+    def test_current_condition_uses_nearest_row_and_night_variant(self):
+        reference = datetime(2026, 7, 25, 2, 30, tzinfo=timezone.utc)
+        rows = self._condition_rows(reference)
+
+        condition = forecast.current_condition(
+            rows,
+            reference,
+            precipitation_amount=0.0,
+            is_daytime_at=lambda _: False,
+        )
+
+        self.assertEqual(condition, "clear-night")
+
+    def test_current_condition_rejects_stale_rows(self):
+        reference = datetime(2026, 7, 25, 8, tzinfo=timezone.utc)
+        rows = self._condition_rows(
+            datetime(2026, 7, 25, 2, 30, tzinfo=timezone.utc)
+        )
+
+        condition = forecast.current_condition(rows, reference)
+
+        self.assertEqual(condition, "cloudy")
+
+    def test_current_condition_falls_back_without_rows(self):
+        condition = forecast.current_condition(
+            [],
+            datetime(2026, 7, 25, 2, 30, tzinfo=timezone.utc),
+        )
+
+        self.assertEqual(condition, "cloudy")
+
+    def _condition_rows(self, reference):
+        start = reference.replace(minute=0)
+        return forecast.parse_helper_forecast(
+            {
+                "model_run_time": (start - timedelta(hours=6))
+                .isoformat()
+                .replace("+00:00", "Z"),
+                "source_url": "https://example.test/aladin.json",
+                "source_run_id": "condition-run",
+                "rows": [
+                    {
+                        "valid_time": (start + timedelta(hours=offset))
+                        .isoformat()
+                        .replace("+00:00", "Z"),
+                        "cloud_cover": cloud_cover,
+                        "precipitation_amount": 0,
+                    }
+                    for offset, cloud_cover in [(-1, 80), (0, 10), (1, 60)]
+                ],
+            }
+        )
+
     def test_rows_as_daily_forecast_completes_current_day_with_history(self):
         day = datetime(2026, 7, 19, tzinfo=timezone.utc)
         rows = forecast.parse_helper_forecast(

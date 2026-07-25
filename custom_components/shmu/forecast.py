@@ -28,6 +28,7 @@ FORECAST_SERIES_FIELDS = {
     "precipitation_amount",
 }
 FORECAST_COMPARISON_DECIMALS = 3
+CURRENT_CONDITION_MAX_DISTANCE = timedelta(hours=2)
 
 
 @dataclass(frozen=True)
@@ -183,6 +184,43 @@ def rows_as_hourly_forecast(
                 forecast["condition"] = "clear-night"
         forecasts.append(forecast)
     return forecasts
+
+
+def current_condition(
+    rows: list[ForecastRow],
+    reference_time: datetime,
+    precipitation_amount: float | None = None,
+    is_daytime_at: Callable[[datetime], bool] | None = None,
+    max_distance: timedelta = CURRENT_CONDITION_MAX_DISTANCE,
+) -> str:
+    """Return the observed-rain or nearest fresh model condition."""
+    if (
+        precipitation_amount is not None
+        and float(precipitation_amount) >= PRECIPITATION_THRESHOLD_MM
+    ):
+        return "rainy"
+
+    reference_utc = _as_aware_utc(reference_time)
+    if not rows:
+        return "cloudy"
+    nearest = min(
+        rows,
+        key=lambda row: (
+            abs(row.valid_time - reference_utc),
+            row.valid_time > reference_utc,
+        ),
+    )
+    if abs(nearest.valid_time - reference_utc) > max_distance:
+        return "cloudy"
+
+    condition = _condition_for_row(nearest)
+    if (
+        is_daytime_at is not None
+        and not is_daytime_at(reference_utc)
+        and condition in {"sunny", "partlycloudy"}
+    ):
+        return "clear-night"
+    return condition
 
 
 def rows_as_daily_forecast(

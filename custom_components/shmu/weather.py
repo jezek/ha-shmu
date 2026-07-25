@@ -13,7 +13,12 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from .cache_paths import ecmwf_epsgram_cache_path_for_entry, forecast_cache_path_for_entry
 from .const import DOMAIN
 from .entity_helpers import ecmwf_epsgram_device_info, forecast_device_info
-from .forecast import ForecastCache, rows_as_daily_forecast, rows_as_hourly_forecast
+from .forecast import (
+    ForecastCache,
+    current_condition,
+    rows_as_daily_forecast,
+    rows_as_hourly_forecast,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -45,11 +50,13 @@ class SHMUWeather(CoordinatorEntity, WeatherEntity):
 
     @property
     def condition(self) -> str | None:
-        """Return a conservative current condition from observation rain data."""
-        precipitation = self.coordinator.data.get("zra_uhrn")
-        if precipitation is not None and float(precipitation) > 0:
-            return "rainy"
-        return "cloudy"
+        """Return observed rain or the nearest fresh ALADIN condition."""
+        return current_condition(
+            self.coordinator.forecast_rows,
+            datetime.now(timezone.utc),
+            self.coordinator.data.get("zra_uhrn"),
+            is_daytime_at=lambda valid_time: is_up(self.hass, valid_time),
+        )
 
     @property
     def native_temperature(self):
