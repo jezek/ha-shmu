@@ -350,6 +350,40 @@ class TestForecastHelperContract(unittest.TestCase):
         self.assertEqual(daily[0]["temperature"], 45.0)
         self.assertEqual(daily[0]["templow"], 22.0)
 
+    def test_rows_as_daily_forecast_accepts_complete_sparse_model_days(self):
+        start = datetime(2026, 7, 24, 12, tzinfo=timezone.utc)
+        rows = forecast.parse_helper_forecast(
+            {
+                "model_run_time": start.isoformat().replace("+00:00", "Z"),
+                "source_url": "https://example.test/epsgram.json",
+                "source_run_id": "epsgram-run",
+                "rows": [
+                    {
+                        "valid_time": (start + timedelta(hours=offset))
+                        .isoformat()
+                        .replace("+00:00", "Z"),
+                        "temperature": float(offset),
+                    }
+                    for offset in range(0, 73, 3)
+                ],
+            }
+        )
+
+        daily = forecast.rows_as_daily_forecast(
+            rows,
+            require_hourly_coverage=False,
+        )
+
+        self.assertEqual(
+            [item["datetime"] for item in daily],
+            [
+                "2026-07-25T12:00:00Z",
+                "2026-07-26T12:00:00Z",
+            ],
+        )
+        self.assertEqual(daily[0]["templow"], 12.0)
+        self.assertEqual(daily[0]["temperature"], 33.0)
+
     def test_rows_as_daily_forecast_completes_current_day_with_history(self):
         day = datetime(2026, 7, 19, tzinfo=timezone.utc)
         rows = forecast.parse_helper_forecast(

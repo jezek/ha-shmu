@@ -146,7 +146,7 @@ class SHMUECMWFEPSGRAMWeather(CoordinatorEntity, WeatherEntity):
     async def async_forecast_daily(self):
         """Return cached ECMWF EPSGRAM daily forecast aggregates."""
         rows = await self.hass.async_add_executor_job(self._load_rows)
-        return rows_as_daily_forecast(rows)
+        return rows_as_daily_forecast(rows, require_hourly_coverage=False)
 
     def _load_rows(self):
         try:
