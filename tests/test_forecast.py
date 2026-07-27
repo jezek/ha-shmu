@@ -127,11 +127,29 @@ class TestForecastHelperContract(unittest.TestCase):
         self.assertEqual(info["path"], str(cache_path))
         self.assertEqual(info["row_count"], 2)
         self.assertEqual(info["file_modified_time"], "2026-06-03T04:00:00Z")
+        self.assertEqual(info["downloaded_time"], "2026-06-03T04:00:00Z")
         self.assertEqual(info["age_seconds"], 5400.0)
         self.assertEqual(info["model_run_time"], "2026-06-03T00:00:00Z")
         self.assertEqual(info["oldest_valid_time"], "2026-06-03T01:00:00Z")
         self.assertEqual(info["newest_valid_time"], "2026-06-03T03:00:00Z")
         self.assertEqual(info["source_run_id"], "aladinsk-20260603-0000")
+        self.assertEqual(info["source_url"], "https://example.test/cache.json")
+        self.assertEqual(info["source_filename"], "cache.json")
+
+    def test_forecast_cache_info_decodes_source_filename(self):
+        payload = {
+            "model_run_time": "2026-06-03T00:00:00Z",
+            "source_url": "https://example.test/ecmwf/31396_2026-06-03%2000.json?download=1",
+            "source_run_id": "ecmwf-31396-2026-06-03T00:00:00Z",
+            "rows": [{"valid_time": "2026-06-03T01:00:00Z", "temperature": 17.2}],
+        }
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            cache = forecast.ForecastCache(Path(temp_dir) / "ecmwf.json")
+            cache.save_payload(payload)
+            info = cache.info()
+
+        self.assertEqual(info["source_filename"], "31396_2026-06-03 00.json")
 
     def test_rows_as_hourly_forecast_sorts_and_maps_weather_fields(self):
         rows = forecast.parse_helper_forecast(

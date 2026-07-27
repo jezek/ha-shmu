@@ -15,6 +15,7 @@ import os
 from pathlib import Path
 import tempfile
 from typing import Any
+from urllib.parse import unquote, urlparse
 
 PRECIPITATION_THRESHOLD_MM = 0.1
 CLEAR_CLOUD_COVER_THRESHOLD = 30.0
@@ -115,16 +116,21 @@ class ForecastCache:
         else:
             reference_time = _as_aware_utc(reference_time)
 
+        source_url = rows[0].source_url
+        source_filename = Path(unquote(urlparse(source_url).path)).name or None
+        formatted_modified_time = _format_datetime(modified_time)
         return {
             "path": os.fspath(self._path),
             "row_count": len(rows),
-            "file_modified_time": _format_datetime(modified_time),
+            "file_modified_time": formatted_modified_time,
+            "downloaded_time": formatted_modified_time,
             "age_seconds": max(0.0, (reference_time - modified_time).total_seconds()),
             "model_run_time": _format_datetime(rows[0].model_run_time),
             "oldest_valid_time": _format_datetime(min(row.valid_time for row in rows)),
             "newest_valid_time": _format_datetime(max(row.valid_time for row in rows)),
             "source_run_id": rows[0].source_run_id,
-            "source_url": rows[0].source_url,
+            "source_url": source_url,
+            "source_filename": source_filename,
         }
 
     def save(self, rows: list[ForecastRow]) -> None:
