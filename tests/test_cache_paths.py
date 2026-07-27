@@ -1,6 +1,7 @@
 import importlib.util
 from pathlib import Path
 import sys
+import tempfile
 import types
 import unittest
 
@@ -90,6 +91,65 @@ class TestCachePaths(unittest.TestCase):
             cache_paths.ecmwf_meteogram_cache_path_for_entry(_Hass(), _Entry()),
             cache_paths.forecast_cache_path_for_entry(_Hass(), _Entry()),
         )
+
+    def test_migrates_legacy_ecmwf_epsgram_cache(self):
+        cache_paths = _load_cache_paths()
+
+        with tempfile.TemporaryDirectory() as config_dir:
+            class Config:
+                @staticmethod
+                def path(*parts):
+                    return str(Path(config_dir, *parts))
+
+            class Hass:
+                config = Config()
+
+            legacy_path = Path(
+                config_dir,
+                "shmu",
+                "ecmwf-epsgram-cache-entry-123.json",
+            )
+            legacy_path.parent.mkdir()
+            legacy_path.write_text('{"forecast": []}', encoding="utf-8")
+
+            self.assertTrue(
+                cache_paths.migrate_legacy_ecmwf_meteogram_cache(Hass(), _Entry())
+            )
+            migrated_path = Path(
+                config_dir,
+                "shmu",
+                "ecmwf-meteogram-cache-entry-123.json",
+            )
+            self.assertEqual(
+                migrated_path.read_text(encoding="utf-8"),
+                '{"forecast": []}',
+            )
+            self.assertFalse(legacy_path.exists())
+
+    def test_does_not_overwrite_existing_ecmwf_meteogram_cache(self):
+        cache_paths = _load_cache_paths()
+
+        with tempfile.TemporaryDirectory() as config_dir:
+            class Config:
+                @staticmethod
+                def path(*parts):
+                    return str(Path(config_dir, *parts))
+
+            class Hass:
+                config = Config()
+
+            cache_dir = Path(config_dir, "shmu")
+            cache_dir.mkdir()
+            legacy_path = cache_dir / "ecmwf-epsgram-cache-entry-123.json"
+            migrated_path = cache_dir / "ecmwf-meteogram-cache-entry-123.json"
+            legacy_path.write_text("legacy", encoding="utf-8")
+            migrated_path.write_text("current", encoding="utf-8")
+
+            self.assertFalse(
+                cache_paths.migrate_legacy_ecmwf_meteogram_cache(Hass(), _Entry())
+            )
+            self.assertEqual(migrated_path.read_text(encoding="utf-8"), "current")
+            self.assertEqual(legacy_path.read_text(encoding="utf-8"), "legacy")
 
 
 if __name__ == "__main__":

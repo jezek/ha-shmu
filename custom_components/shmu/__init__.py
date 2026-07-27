@@ -5,7 +5,11 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 import logging
 from datetime import datetime, timedelta, timezone
-from .cache_paths import ecmwf_meteogram_cache_path_for_entry, forecast_cache_path_for_entry
+from .cache_paths import (
+    ecmwf_meteogram_cache_path_for_entry,
+    forecast_cache_path_for_entry,
+    migrate_legacy_ecmwf_meteogram_cache,
+)
 from .const import CONF_FORECAST_SOURCE, DOMAIN
 from .api import SHMUAPI
 from .forecast import ForecastCache
@@ -17,6 +21,11 @@ _LOGGER = logging.getLogger(__name__)
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up SHMU integration from a config entry."""
     hass.data.setdefault(DOMAIN, {})
+    await hass.async_add_executor_job(
+        migrate_legacy_ecmwf_meteogram_cache,
+        hass,
+        entry,
+    )
 
     coordinator = SHMUDataUpdateCoordinator(hass, entry)
     await coordinator.async_config_entry_first_refresh()

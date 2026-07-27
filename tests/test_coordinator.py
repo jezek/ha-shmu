@@ -72,6 +72,7 @@ def _load_coordinator_module():
         "cache_paths": {
             "ecmwf_meteogram_cache_path_for_entry": Mock(),
             "forecast_cache_path_for_entry": Mock(),
+            "migrate_legacy_ecmwf_meteogram_cache": Mock(),
         },
         "const": {"CONF_FORECAST_SOURCE": "forecast_source", "DOMAIN": "shmu"},
         "api": {"SHMUAPI": type("SHMUAPI", (), {})},
