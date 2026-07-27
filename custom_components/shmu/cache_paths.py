@@ -8,7 +8,7 @@ from .const import CONF_FORECAST_CACHE_PATH
 
 FORECAST_CACHE_DIR = "shmu"
 FORECAST_CACHE_FILENAME_TEMPLATE = "forecast-cache-{entry_id}.json"
-ECMWF_EPSGRAM_CACHE_FILENAME_TEMPLATE = "ecmwf-epsgram-cache-{entry_id}.json"
+ECMWF_METEOGRAM_CACHE_FILENAME_TEMPLATE = "ecmwf-meteogram-cache-{entry_id}.json"
 
 
 def forecast_cache_path_for_entry(hass: Any, config_entry: Any) -> str:
@@ -26,9 +26,9 @@ def forecast_cache_path_for_entry(hass: Any, config_entry: Any) -> str:
     )
 
 
-def ecmwf_epsgram_cache_path_for_entry(hass: Any, config_entry: Any) -> str:
-    """Return the integration-owned ECMWF EPSGRAM cache path for an entry."""
+def ecmwf_meteogram_cache_path_for_entry(hass: Any, config_entry: Any) -> str:
+    """Return the integration-owned ECMWF 10-day meteogram cache path for an entry."""
     return hass.config.path(
         FORECAST_CACHE_DIR,
-        ECMWF_EPSGRAM_CACHE_FILENAME_TEMPLATE.format(entry_id=config_entry.entry_id),
+        ECMWF_METEOGRAM_CACHE_FILENAME_TEMPLATE.format(entry_id=config_entry.entry_id),
     )

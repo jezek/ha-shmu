@@ -1,4 +1,4 @@
-"""Helpers for SHMU interactive EPSGRAM product metadata."""
+"""Helpers for SHMU ECMWF 10-day meteogram product metadata."""
 
 from __future__ import annotations
 
@@ -48,8 +48,8 @@ def product_json_url(file_link: str) -> str:
     return f"https://www.shmu.sk/data/datanwp/json/{clean_link}"
 
 
-def ecmwf_helper_payload(payload: dict[str, Any], source_url: str) -> dict[str, Any]:
-    """Convert an ECMWF EPSGRAM JSON payload into the helper forecast contract."""
+def ecmwf_meteogram_helper_payload(payload: dict[str, Any], source_url: str) -> dict[str, Any]:
+    """Convert an ECMWF 10-day meteogram JSON payload into the helper forecast contract."""
     model_run_time = _parse_datetime(str(payload.get("data_date_time", "")))
     temperature_by_time = _series_by_column(payload, "Air_temperature_at_2m", "Median")
     if not temperature_by_time:

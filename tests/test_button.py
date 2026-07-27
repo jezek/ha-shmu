@@ -89,7 +89,7 @@ class _Coordinator:
         self.forecast_calls += 1
         return self._forecast_result
 
-    async def _async_refresh_ecmwf_epsgram_cache(self):
+    async def _async_refresh_ecmwf_meteogram_cache(self):
         self.ecmwf_calls += 1
         return self._ecmwf_result
 
@@ -118,16 +118,16 @@ class TestRefreshButtons(unittest.IsolatedAsyncioTestCase):
         button = _load_button()
         coordinator = _Coordinator()
 
-        entity = button.SHMUECMWFEPSGRAMRefreshButton(coordinator)
+        entity = button.SHMUECMWFMeteogramRefreshButton(coordinator)
         await entity.async_press()
 
         self.assertEqual(
             entity._attr_unique_id,
-            "shmu_entry-123_refresh_ecmwf_epsgram_cache",
+            "shmu_entry-123_refresh_ecmwf_meteogram_cache",
         )
         self.assertEqual(
             entity._attr_device_info["identifiers"],
-            {("shmu", "entry-123_ecmwf_epsgram")},
+            {("shmu", "entry-123_ecmwf_meteogram")},
         )
         self.assertEqual(coordinator.ecmwf_calls, 1)
         self.assertEqual(coordinator.listener_updates, 1)

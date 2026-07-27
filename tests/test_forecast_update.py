@@ -378,7 +378,7 @@ class TestForecastUpdate(unittest.TestCase):
         self.assertEqual(written["source_run_id"], "aladin-sk-4.5km-20260713-1200")
         self.assertIn("/20260713/1200/al-grib_sk_000-20260713-1200-", calls[0])
 
-    def test_update_forecast_cache_latest_ecmwf_epsgram_writes_cache(self):
+    def test_update_forecast_cache_latest_ecmwf_meteogram_writes_cache(self):
         forecast_update = _load_forecast_update()
         calls = []
 
@@ -433,7 +433,7 @@ class TestForecastUpdate(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             cache_path = Path(temp_dir) / "forecast-cache.json"
 
-            result = forecast_update.update_forecast_cache_latest_ecmwf_epsgram(
+            result = forecast_update.update_forecast_cache_latest_ecmwf_meteogram(
                 cache_path,
                 station_id="31396",
                 timeout=5,

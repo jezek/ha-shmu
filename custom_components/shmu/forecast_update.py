@@ -19,12 +19,12 @@ from .aladin import (
     run_id,
     run_url,
 )
-from .epsgram import ecmwf_helper_payload, latest_station_product, product_json_url
+from .ecmwf_meteogram import ecmwf_meteogram_helper_payload, latest_station_product, product_json_url
 from .forecast import ForecastCache, parse_helper_forecast
 
 DEFAULT_ALADIN_TEMPERATURE_LEAD_HOURS = tuple(range(79))
 FORECAST_CACHE_USER_AGENT = "ha-shmu-forecast-cache/1.0"
-SHMU_EPSGRAM_STATION_PRODUCTS_URL = (
+SHMU_ECMWF_STATION_PRODUCTS_URL = (
     "https://www.shmu.sk/api/v1/nwp/getstationproducts?station={station_id}"
 )
 
@@ -141,15 +141,15 @@ def update_forecast_cache_latest_aladin_temperature(
     raise FileNotFoundError("no published ALADIN run found in the latest candidates")
 
 
-def update_forecast_cache_latest_ecmwf_epsgram(
+def update_forecast_cache_latest_ecmwf_meteogram(
     cache_path: str | Path,
     *,
     station_id: str,
     timeout: int = 30,
     opener=None,
 ) -> dict[str, Any]:
-    """Update the cache from the latest interactive ECMWF EPSGRAM product."""
-    station_products_url = SHMU_EPSGRAM_STATION_PRODUCTS_URL.format(station_id=station_id)
+    """Update the cache from the latest interactive ECMWF 10-day meteogram product."""
+    station_products_url = SHMU_ECMWF_STATION_PRODUCTS_URL.format(station_id=station_id)
     station_products = read_json_url(station_products_url, timeout=timeout, opener=opener)
     product = latest_station_product(station_products, "ecmwf")
     file_link = product.get("file_link")
@@ -157,10 +157,10 @@ def update_forecast_cache_latest_ecmwf_epsgram(
         raise ValueError("ECMWF station product must contain file_link")
 
     source_url = product_json_url(file_link)
-    epsgram_payload = read_json_url(source_url, timeout=timeout, opener=opener)
+    meteogram_payload = read_json_url(source_url, timeout=timeout, opener=opener)
     return update_forecast_cache_payload(
         cache_path,
-        ecmwf_helper_payload(epsgram_payload, source_url),
+        ecmwf_meteogram_helper_payload(meteogram_payload, source_url),
     )
 
 

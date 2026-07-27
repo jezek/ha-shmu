@@ -10,9 +10,9 @@ from homeassistant.components.weather import WeatherEntity, WeatherEntityFeature
 from homeassistant.helpers.sun import is_up
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .cache_paths import ecmwf_epsgram_cache_path_for_entry, forecast_cache_path_for_entry
+from .cache_paths import ecmwf_meteogram_cache_path_for_entry, forecast_cache_path_for_entry
 from .const import DOMAIN
-from .entity_helpers import ecmwf_epsgram_device_info, forecast_device_info
+from .entity_helpers import ecmwf_meteogram_device_info, forecast_device_info
 from .forecast import (
     ForecastCache,
     current_condition,
@@ -107,11 +107,11 @@ class SHMUWeather(CoordinatorEntity, WeatherEntity):
             return []
 
 
-class SHMUECMWFEPSGRAMWeather(CoordinatorEntity, WeatherEntity):
-    """SHMU ECMWF EPSGRAM weather entity backed by its separate cache."""
+class SHMUECMWFMeteogramWeather(CoordinatorEntity, WeatherEntity):
+    """SHMU ECMWF 10-day meteogram weather entity backed by its separate cache."""
 
     _attr_has_entity_name = True
-    _attr_name = "ECMWF EPSGRAM"
+    _attr_name = "ECMWF 10-day meteogram"
     _attr_supported_features = (
         WeatherEntityFeature.FORECAST_HOURLY | WeatherEntityFeature.FORECAST_DAILY
     )
@@ -121,29 +121,29 @@ class SHMUECMWFEPSGRAMWeather(CoordinatorEntity, WeatherEntity):
     _attr_native_precipitation_unit = "mm"
 
     def __init__(self, coordinator, cache_path: str):
-        """Initialize the ECMWF EPSGRAM forecast weather entity."""
+        """Initialize the ECMWF 10-day meteogram forecast weather entity."""
         super().__init__(coordinator)
         self._cache_path = cache_path
         self._cache = ForecastCache(cache_path)
         self._attr_unique_id = (
-            f"{DOMAIN}_{coordinator.config_entry.entry_id}_ecmwf_epsgram_weather"
+            f"{DOMAIN}_{coordinator.config_entry.entry_id}_ecmwf_meteogram_weather"
         )
-        self._attr_device_info = ecmwf_epsgram_device_info(coordinator)
+        self._attr_device_info = ecmwf_meteogram_device_info(coordinator)
 
     @property
     def available(self) -> bool:
-        """Return whether an ECMWF EPSGRAM cache is available."""
+        """Return whether an ECMWF 10-day meteogram cache is available."""
         return bool(getattr(self.coordinator, "ecmwf_forecast_rows", [])) or Path(
             self._cache_path
         ).exists()
 
     @property
     def condition(self) -> str | None:
-        """Return no current condition for the ensemble-only forecast surface."""
+        """Return no current condition for the forecast-only meteogram surface."""
         return None
 
     async def async_forecast_hourly(self):
-        """Return cached ECMWF EPSGRAM hourly forecast rows."""
+        """Return cached ECMWF 10-day meteogram hourly forecast rows."""
         rows = await self.hass.async_add_executor_job(self._load_rows)
         return rows_as_hourly_forecast(
             rows,
@@ -151,7 +151,7 @@ class SHMUECMWFEPSGRAMWeather(CoordinatorEntity, WeatherEntity):
         )
 
     async def async_forecast_daily(self):
-        """Return cached ECMWF EPSGRAM daily forecast aggregates."""
+        """Return cached ECMWF 10-day meteogram daily forecast aggregates."""
         rows = await self.hass.async_add_executor_job(self._load_rows)
         return rows_as_daily_forecast(rows, require_hourly_coverage=False)
 
@@ -161,7 +161,7 @@ class SHMUECMWFEPSGRAMWeather(CoordinatorEntity, WeatherEntity):
         except FileNotFoundError:
             return []
         except ValueError as err:
-            _LOGGER.warning("Invalid SHMU ECMWF EPSGRAM cache: %s", err)
+            _LOGGER.warning("Invalid SHMU ECMWF 10-day meteogram cache: %s", err)
             return []
 
 
@@ -169,10 +169,10 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
     """Set up the SHMU weather entities."""
     coordinator = hass.data[DOMAIN][config_entry.entry_id]["coordinator"]
     cache_path = forecast_cache_path_for_entry(hass, config_entry)
-    ecmwf_cache_path = ecmwf_epsgram_cache_path_for_entry(hass, config_entry)
+    ecmwf_cache_path = ecmwf_meteogram_cache_path_for_entry(hass, config_entry)
     async_add_entities(
         [
             SHMUWeather(coordinator, cache_path),
-            SHMUECMWFEPSGRAMWeather(coordinator, ecmwf_cache_path),
+            SHMUECMWFMeteogramWeather(coordinator, ecmwf_cache_path),
         ]
     )

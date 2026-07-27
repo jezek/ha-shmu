@@ -20,7 +20,7 @@ from .const import (
     DOMAIN,
     SERVICE_GET_FORECAST_COMPARISON,
     SERVICE_GET_FORECAST_SERIES,
-    SERVICE_REFRESH_ECMWF_EPSGRAM_CACHE,
+    SERVICE_REFRESH_ECMWF_METEOGRAM_CACHE,
     SERVICE_REFRESH_FORECAST_CACHE,
 )
 from .forecast import (
@@ -69,7 +69,7 @@ REFRESH_FORECAST_CACHE_SCHEMA = vol.Schema(
     }
 )
 
-REFRESH_ECMWF_EPSGRAM_CACHE_SCHEMA = vol.Schema(
+REFRESH_ECMWF_METEOGRAM_CACHE_SCHEMA = vol.Schema(
     {
         vol.Optional(CONF_ENTRY_ID): cv.string,
         vol.Optional(CONF_STATION_ID): cv.string,
@@ -122,15 +122,15 @@ async def async_setup_services(hass: HomeAssistant) -> None:
             "info": result["info"],
         }
 
-    async def refresh_ecmwf_epsgram_cache(call: ServiceCall) -> dict[str, Any]:
+    async def refresh_ecmwf_meteogram_cache(call: ServiceCall) -> dict[str, Any]:
         entry_data = _entry_data_for_call(hass, call)
         coordinator = entry_data["coordinator"]
-        result = await coordinator._async_refresh_ecmwf_epsgram_cache(
+        result = await coordinator._async_refresh_ecmwf_meteogram_cache(
             station_id=call.data.get(CONF_STATION_ID)
         )
         coordinator.async_update_listeners()
         if result is None:
-            raise HomeAssistantError("SHMU ECMWF EPSGRAM cache refresh failed")
+            raise HomeAssistantError("SHMU ECMWF 10-day meteogram cache refresh failed")
         return {
             "entry_id": coordinator.config_entry.entry_id,
             "station_id": result["station_id"],
@@ -161,9 +161,9 @@ async def async_setup_services(hass: HomeAssistant) -> None:
     )
     hass.services.async_register(
         DOMAIN,
-        SERVICE_REFRESH_ECMWF_EPSGRAM_CACHE,
-        refresh_ecmwf_epsgram_cache,
-        schema=REFRESH_ECMWF_EPSGRAM_CACHE_SCHEMA,
+        SERVICE_REFRESH_ECMWF_METEOGRAM_CACHE,
+        refresh_ecmwf_meteogram_cache,
+        schema=REFRESH_ECMWF_METEOGRAM_CACHE_SCHEMA,
         supports_response=SupportsResponse.ONLY,
     )
     hass.data[DOMAIN][_SERVICES_REGISTERED] = True
@@ -181,7 +181,7 @@ async def async_unload_services(hass: HomeAssistant) -> None:
     hass.services.async_remove(DOMAIN, SERVICE_GET_FORECAST_SERIES)
     hass.services.async_remove(DOMAIN, SERVICE_GET_FORECAST_COMPARISON)
     hass.services.async_remove(DOMAIN, SERVICE_REFRESH_FORECAST_CACHE)
-    hass.services.async_remove(DOMAIN, SERVICE_REFRESH_ECMWF_EPSGRAM_CACHE)
+    hass.services.async_remove(DOMAIN, SERVICE_REFRESH_ECMWF_METEOGRAM_CACHE)
     domain_data.pop(_SERVICES_REGISTERED, None)
 
 

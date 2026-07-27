@@ -373,8 +373,8 @@ class TestForecastHelperContract(unittest.TestCase):
         rows = forecast.parse_helper_forecast(
             {
                 "model_run_time": start.isoformat().replace("+00:00", "Z"),
-                "source_url": "https://example.test/epsgram.json",
-                "source_run_id": "epsgram-run",
+                "source_url": "https://example.test/meteogram.json",
+                "source_run_id": "meteogram-run",
                 "rows": [
                     {
                         "valid_time": (start + timedelta(hours=offset))

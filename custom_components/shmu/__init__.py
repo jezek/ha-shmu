@@ -5,11 +5,11 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 import logging
 from datetime import datetime, timedelta, timezone
-from .cache_paths import ecmwf_epsgram_cache_path_for_entry, forecast_cache_path_for_entry
+from .cache_paths import ecmwf_meteogram_cache_path_for_entry, forecast_cache_path_for_entry
 from .const import CONF_FORECAST_SOURCE, DOMAIN
 from .api import SHMUAPI
 from .forecast import ForecastCache
-from .forecast_jobs import ecmwf_epsgram_cache_update_job, forecast_cache_update_job
+from .forecast_jobs import ecmwf_meteogram_cache_update_job, forecast_cache_update_job
 from .services import async_setup_services, async_unload_services
 
 _LOGGER = logging.getLogger(__name__)
@@ -76,7 +76,7 @@ class SHMUDataUpdateCoordinator(DataUpdateCoordinator):
             session = async_get_clientsession(self._hass)
             data = await self._api.fetch_data(session)
             await self._async_refresh_forecast_cache()
-            await self._async_refresh_ecmwf_epsgram_cache()
+            await self._async_refresh_ecmwf_meteogram_cache()
             return data
         except Exception as err:
             raise UpdateFailed(f"Error communicating with SHMU API: {err}")
@@ -133,11 +133,11 @@ class SHMUDataUpdateCoordinator(DataUpdateCoordinator):
         except Exception as err:
             _LOGGER.warning("Unable to complete leading SHMU forecast day: %s", err)
 
-    async def _async_refresh_ecmwf_epsgram_cache(self, station_id: str | None = None):
-        """Refresh the separate ECMWF EPSGRAM cache on explicit request."""
-        selected_station_id = station_id or self._default_epsgram_station_id()
-        cache_path = ecmwf_epsgram_cache_path_for_entry(self._hass, self._entry)
-        update_job = ecmwf_epsgram_cache_update_job(
+    async def _async_refresh_ecmwf_meteogram_cache(self, station_id: str | None = None):
+        """Refresh the separate ECMWF 10-day meteogram cache on explicit request."""
+        selected_station_id = station_id or self._default_meteogram_station_id()
+        cache_path = ecmwf_meteogram_cache_path_for_entry(self._hass, self._entry)
+        update_job = ecmwf_meteogram_cache_update_job(
             cache_path,
             station_id=selected_station_id,
         )
@@ -149,15 +149,15 @@ class SHMUDataUpdateCoordinator(DataUpdateCoordinator):
             )
             self.ecmwf_cache_info = result["info"]
         except Exception as err:
-            _LOGGER.warning("Unable to refresh SHMU ECMWF EPSGRAM cache: %s", err)
+            _LOGGER.warning("Unable to refresh SHMU ECMWF 10-day meteogram cache: %s", err)
             return None
 
         if result["changed"]:
-            _LOGGER.debug("Refreshed SHMU ECMWF EPSGRAM cache: %s", result["info"])
+            _LOGGER.debug("Refreshed SHMU ECMWF 10-day meteogram cache: %s", result["info"])
         return {**result, "station_id": selected_station_id}
 
-    def _default_epsgram_station_id(self) -> str:
-        """Return the configured EPSGRAM-like station id for manual ECMWF refresh."""
+    def _default_meteogram_station_id(self) -> str:
+        """Return the configured ECMWF meteogram station id for manual ECMWF refresh."""
         if self._meteogram_id and self._meteogram_id != "none":
             return self._meteogram_id
         return self._station_id
@@ -170,5 +170,5 @@ class SHMUDataUpdateCoordinator(DataUpdateCoordinator):
     async def _async_midnight_forecast_refresh(self) -> None:
         """Refresh only forecast cache and notify forecast entities."""
         await self._async_refresh_forecast_cache()
-        await self._async_refresh_ecmwf_epsgram_cache()
+        await self._async_refresh_ecmwf_meteogram_cache()
         self.async_update_listeners()

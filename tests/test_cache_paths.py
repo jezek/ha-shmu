@@ -79,15 +79,15 @@ class TestCachePaths(unittest.TestCase):
             "/config/options-cache.json",
         )
 
-    def test_ecmwf_epsgram_cache_path_defaults_to_separate_integration_owned_path(self):
+    def test_ecmwf_meteogram_cache_path_defaults_to_separate_integration_owned_path(self):
         cache_paths = _load_cache_paths()
 
         self.assertEqual(
-            cache_paths.ecmwf_epsgram_cache_path_for_entry(_Hass(), _Entry()),
-            "/config/shmu/ecmwf-epsgram-cache-entry-123.json",
+            cache_paths.ecmwf_meteogram_cache_path_for_entry(_Hass(), _Entry()),
+            "/config/shmu/ecmwf-meteogram-cache-entry-123.json",
         )
         self.assertNotEqual(
-            cache_paths.ecmwf_epsgram_cache_path_for_entry(_Hass(), _Entry()),
+            cache_paths.ecmwf_meteogram_cache_path_for_entry(_Hass(), _Entry()),
             cache_paths.forecast_cache_path_for_entry(_Hass(), _Entry()),
         )
 

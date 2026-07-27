@@ -76,7 +76,7 @@ refresh_forecast_cache:
       selector:
         text: {}
 
-refresh_ecmwf_epsgram_cache:
+refresh_ecmwf_meteogram_cache:
   fields:
     entry_id:
       example: "01J..."

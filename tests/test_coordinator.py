@@ -70,14 +70,14 @@ def _load_coordinator_module():
 
     dependency_values = {
         "cache_paths": {
-            "ecmwf_epsgram_cache_path_for_entry": Mock(),
+            "ecmwf_meteogram_cache_path_for_entry": Mock(),
             "forecast_cache_path_for_entry": Mock(),
         },
         "const": {"CONF_FORECAST_SOURCE": "forecast_source", "DOMAIN": "shmu"},
         "api": {"SHMUAPI": type("SHMUAPI", (), {})},
         "forecast": {"ForecastCache": type("ForecastCache", (), {})},
         "forecast_jobs": {
-            "ecmwf_epsgram_cache_update_job": Mock(),
+            "ecmwf_meteogram_cache_update_job": Mock(),
             "forecast_cache_update_job": Mock(),
         },
         "services": {
@@ -110,7 +110,7 @@ def _load_coordinator_module():
 
 
 class TestCoordinatorForecastLifecycle(unittest.IsolatedAsyncioTestCase):
-    async def test_update_refreshes_aladin_and_epsgram_before_returning_station_data(self):
+    async def test_update_refreshes_aladin_and_meteogram_before_returning_station_data(self):
         coordinator_module = _load_coordinator_module()
         coordinator = object.__new__(coordinator_module.SHMUDataUpdateCoordinator)
         coordinator._hass = object()
@@ -118,25 +118,25 @@ class TestCoordinatorForecastLifecycle(unittest.IsolatedAsyncioTestCase):
             fetch_data=AsyncMock(return_value={"station": "data"})
         )
         coordinator._async_refresh_forecast_cache = AsyncMock()
-        coordinator._async_refresh_ecmwf_epsgram_cache = AsyncMock(return_value=None)
+        coordinator._async_refresh_ecmwf_meteogram_cache = AsyncMock(return_value=None)
 
         result = await coordinator._async_update_data()
 
         self.assertEqual(result, {"station": "data"})
         coordinator._async_refresh_forecast_cache.assert_awaited_once_with()
-        coordinator._async_refresh_ecmwf_epsgram_cache.assert_awaited_once_with()
+        coordinator._async_refresh_ecmwf_meteogram_cache.assert_awaited_once_with()
 
     async def test_midnight_refreshes_both_forecasts_and_notifies_entities(self):
         coordinator_module = _load_coordinator_module()
         coordinator = object.__new__(coordinator_module.SHMUDataUpdateCoordinator)
         coordinator._async_refresh_forecast_cache = AsyncMock()
-        coordinator._async_refresh_ecmwf_epsgram_cache = AsyncMock(return_value=None)
+        coordinator._async_refresh_ecmwf_meteogram_cache = AsyncMock(return_value=None)
         coordinator.async_update_listeners = Mock()
 
         await coordinator._async_midnight_forecast_refresh()
 
         coordinator._async_refresh_forecast_cache.assert_awaited_once_with()
-        coordinator._async_refresh_ecmwf_epsgram_cache.assert_awaited_once_with()
+        coordinator._async_refresh_ecmwf_meteogram_cache.assert_awaited_once_with()
         coordinator.async_update_listeners.assert_called_once_with()
 
 

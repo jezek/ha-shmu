@@ -76,23 +76,23 @@ class TestForecastJobs(unittest.TestCase):
             },
         )
 
-    def test_ecmwf_epsgram_cache_update_job_uses_ecmwf_updater(self):
+    def test_ecmwf_meteogram_cache_update_job_uses_ecmwf_updater(self):
         forecast_jobs = _load_module("forecast_jobs")
         forecast_update = sys.modules["custom_components.shmu.forecast_update"]
 
-        job = forecast_jobs.ecmwf_epsgram_cache_update_job(
-            "/config/shmu/ecmwf-epsgram-cache-entry-123.json",
+        job = forecast_jobs.ecmwf_meteogram_cache_update_job(
+            "/config/shmu/ecmwf-meteogram-cache-entry-123.json",
             station_id="31396",
         )
 
         self.assertIsInstance(job, partial)
         self.assertIs(
             job.func,
-            forecast_update.update_forecast_cache_latest_ecmwf_epsgram,
+            forecast_update.update_forecast_cache_latest_ecmwf_meteogram,
         )
         self.assertEqual(
             job.args,
-            ("/config/shmu/ecmwf-epsgram-cache-entry-123.json",),
+            ("/config/shmu/ecmwf-meteogram-cache-entry-123.json",),
         )
         self.assertEqual(job.keywords, {"station_id": "31396"})
 

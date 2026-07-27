@@ -9,11 +9,11 @@ MODULE_PATH = (
     Path(__file__).resolve().parents[1]
     / "custom_components"
     / "shmu"
-    / "epsgram.py"
+    / "ecmwf_meteogram.py"
 )
 
 
-def _load_epsgram():
+def _load_ecmwf_meteogram():
     custom_components = types.ModuleType("custom_components")
     shmu = types.ModuleType("custom_components.shmu")
     custom_components.__path__ = [str(MODULE_PATH.parents[2])]
@@ -22,7 +22,7 @@ def _load_epsgram():
     sys.modules.setdefault("custom_components.shmu", shmu)
 
     spec = importlib.util.spec_from_file_location(
-        "custom_components.shmu.epsgram",
+        "custom_components.shmu.ecmwf_meteogram",
         MODULE_PATH,
     )
     module = importlib.util.module_from_spec(spec)
@@ -31,9 +31,9 @@ def _load_epsgram():
     return module
 
 
-class TestEPSGRAM(unittest.TestCase):
+class TestECMWFMeteogram(unittest.TestCase):
     def test_latest_station_product_selects_newest_type(self):
-        epsgram = _load_epsgram()
+        meteogram = _load_ecmwf_meteogram()
         payload = {
             "data": [
                 {
@@ -54,7 +54,7 @@ class TestEPSGRAM(unittest.TestCase):
             ]
         }
 
-        product = epsgram.latest_station_product(payload, "ecmwf")
+        product = meteogram.latest_station_product(payload, "ecmwf")
 
         self.assertEqual(
             product["file_link"],
@@ -62,21 +62,21 @@ class TestEPSGRAM(unittest.TestCase):
         )
 
     def test_latest_station_product_rejects_missing_type(self):
-        epsgram = _load_epsgram()
+        meteogram = _load_ecmwf_meteogram()
 
         with self.assertRaisesRegex(ValueError, "no station product"):
-            epsgram.latest_station_product({"data": []}, "ecmwf")
+            meteogram.latest_station_product({"data": []}, "ecmwf")
 
     def test_product_json_url_uses_station_product_link(self):
-        epsgram = _load_epsgram()
+        meteogram = _load_ecmwf_meteogram()
 
         self.assertEqual(
-            epsgram.product_json_url("/ecmwf/2026-07-06/file.json"),
+            meteogram.product_json_url("/ecmwf/2026-07-06/file.json"),
             "https://www.shmu.sk/data/datanwp/json/ecmwf/2026-07-06/file.json",
         )
 
-    def test_ecmwf_helper_payload_normalizes_median_rows(self):
-        epsgram = _load_epsgram()
+    def test_ecmwf_meteogram_helper_payload_normalizes_median_rows(self):
+        meteogram = _load_ecmwf_meteogram()
         payload = {
             "data_date_time": "2026-07-06T00:00Z",
             "si_id": "31396",
@@ -122,7 +122,7 @@ class TestEPSGRAM(unittest.TestCase):
             },
         }
 
-        result = epsgram.ecmwf_helper_payload(
+        result = meteogram.ecmwf_meteogram_helper_payload(
             payload,
             "https://www.shmu.sk/data/datanwp/json/ecmwf/file.json",
         )
@@ -149,11 +149,11 @@ class TestEPSGRAM(unittest.TestCase):
         self.assertEqual(result["rows"][1]["temperature"], 16.087)
         self.assertEqual(result["rows"][1]["precipitation_amount"], 0.346)
 
-    def test_ecmwf_helper_payload_rejects_missing_temperature_medians(self):
-        epsgram = _load_epsgram()
+    def test_ecmwf_meteogram_helper_payload_rejects_missing_temperature_medians(self):
+        meteogram = _load_ecmwf_meteogram()
 
         with self.assertRaisesRegex(ValueError, "temperature median rows"):
-            epsgram.ecmwf_helper_payload(
+            meteogram.ecmwf_meteogram_helper_payload(
                 {"data_date_time": "2026-07-06T00:00Z"},
                 "https://www.shmu.sk/data/datanwp/json/ecmwf/file.json",
             )

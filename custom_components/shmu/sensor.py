@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 from .cache_paths import forecast_cache_path_for_entry
 from .const import DOMAIN
 from .entity_helpers import (
-    ecmwf_epsgram_device_info,
+    ecmwf_meteogram_device_info,
     forecast_device_info,
     station_device_info,
 )
@@ -238,7 +238,7 @@ class SHMUECMWFMeteogramCacheInfoSensor(CoordinatorEntity, SensorEntity):
         self._attr_device_class = device_class
         self._attr_state_class = state_class
         self._attr_icon = icon
-        self._attr_device_info = ecmwf_epsgram_device_info(coordinator)
+        self._attr_device_info = ecmwf_meteogram_device_info(coordinator)
 
     @property
     def native_value(self):

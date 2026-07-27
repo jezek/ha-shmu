@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from .forecast_update import (
-    update_forecast_cache_latest_ecmwf_epsgram,
+    update_forecast_cache_latest_ecmwf_meteogram,
     update_forecast_cache_latest_aladin_temperature,
     update_forecast_cache_source,
 )
@@ -37,14 +37,14 @@ def forecast_cache_update_job(
     )
 
 
-def ecmwf_epsgram_cache_update_job(
+def ecmwf_meteogram_cache_update_job(
     cache_path: str | Path,
     *,
     station_id: str,
 ) -> Callable[[], dict[str, Any]]:
-    """Return the executor job for a latest ECMWF EPSGRAM refresh."""
+    """Return the executor job for a latest ECMWF 10-day meteogram refresh."""
     return partial(
-        update_forecast_cache_latest_ecmwf_epsgram,
+        update_forecast_cache_latest_ecmwf_meteogram,
         cache_path,
         station_id=station_id,
     )
