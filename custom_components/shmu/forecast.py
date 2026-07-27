@@ -231,7 +231,6 @@ def rows_as_daily_forecast(
 ) -> list[dict[str, Any]]:
     """Aggregate normalized rows into Home Assistant-style daily forecast dicts."""
     historical_by_day = _historical_temperatures_by_day(historical_temperatures or {})
-    reference_day = reference_time.date().isoformat() if reference_time is not None else None
     days: dict[str, list[ForecastRow]] = {}
     for row in sorted(rows, key=lambda row: row.valid_time):
         day_key = row.valid_time.date().isoformat()
@@ -239,8 +238,11 @@ def rows_as_daily_forecast(
 
     forecasts: list[dict[str, Any]] = []
     row_times = {row.valid_time for row in rows}
+    initial_day = min(days, default=None)
     for day_key, day_rows in days.items():
-        historical_day = historical_by_day.get(day_key, {}) if day_key == reference_day else {}
+        historical_day = (
+            historical_by_day.get(day_key, {}) if day_key == initial_day else {}
+        )
         covered_hours = {row.valid_time.hour for row in day_rows} | set(historical_day)
         if require_hourly_coverage:
             if covered_hours != set(range(24)):

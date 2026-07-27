@@ -114,13 +114,13 @@ class SHMUDataUpdateCoordinator(DataUpdateCoordinator):
         return result
 
     async def _async_refresh_forecast_history(self) -> None:
-        """Load only history needed to complete today's leading forecast boundary."""
+        """Load only history needed to complete the leading forecast boundary."""
         self.forecast_historical_temperatures = {}
         if not self.forecast_rows:
             return
         first_valid_time = min(row.valid_time for row in self.forecast_rows)
         now = datetime.now(timezone.utc)
-        if first_valid_time.date() != now.date() or first_valid_time.hour == 0:
+        if first_valid_time > now or first_valid_time.hour == 0:
             return
         day_start = first_valid_time.replace(hour=0, minute=0, second=0, microsecond=0)
         session = async_get_clientsession(self._hass)
@@ -131,7 +131,7 @@ class SHMUDataUpdateCoordinator(DataUpdateCoordinator):
                 first_valid_time,
             )
         except Exception as err:
-            _LOGGER.warning("Unable to complete current SHMU forecast day: %s", err)
+            _LOGGER.warning("Unable to complete leading SHMU forecast day: %s", err)
 
     async def _async_refresh_ecmwf_epsgram_cache(self, station_id: str | None = None):
         """Refresh the separate ECMWF EPSGRAM cache on explicit request."""
