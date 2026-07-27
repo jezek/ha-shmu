@@ -30,6 +30,7 @@ def _load_coordinator_module():
         "custom_components.shmu.api",
         "custom_components.shmu.forecast",
         "custom_components.shmu.forecast_jobs",
+        "custom_components.shmu.registry_migration",
         "custom_components.shmu.services",
     }
     missing = object()
@@ -80,6 +81,9 @@ def _load_coordinator_module():
         "forecast_jobs": {
             "ecmwf_meteogram_cache_update_job": Mock(),
             "forecast_cache_update_job": Mock(),
+        },
+        "registry_migration": {
+            "async_migrate_legacy_ecmwf_registry": AsyncMock(),
         },
         "services": {
             "async_setup_services": AsyncMock(),

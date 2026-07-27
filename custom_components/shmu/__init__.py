@@ -14,6 +14,7 @@ from .const import CONF_FORECAST_SOURCE, DOMAIN
 from .api import SHMUAPI
 from .forecast import ForecastCache
 from .forecast_jobs import ecmwf_meteogram_cache_update_job, forecast_cache_update_job
+from .registry_migration import async_migrate_legacy_ecmwf_registry
 from .services import async_setup_services, async_unload_services
 
 _LOGGER = logging.getLogger(__name__)
@@ -21,6 +22,7 @@ _LOGGER = logging.getLogger(__name__)
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up SHMU integration from a config entry."""
     hass.data.setdefault(DOMAIN, {})
+    await async_migrate_legacy_ecmwf_registry(hass, entry.entry_id)
     await hass.async_add_executor_job(
         migrate_legacy_ecmwf_meteogram_cache,
         hass,
