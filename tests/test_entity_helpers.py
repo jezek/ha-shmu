@@ -42,7 +42,7 @@ def _load_entity_helpers():
 
 class _ConfigEntry:
     entry_id = "entry-123"
-    data = {"station_id": "11813"}
+    data = {"station_id": "11813", "meteogram_id": "32737"}
 
 
 class _Coordinator:
@@ -79,10 +79,15 @@ class TestEntityHelpers(unittest.TestCase):
         self.assertNotEqual(ecmwf_info["identifiers"], station_info["identifiers"])
         self.assertNotEqual(ecmwf_info["identifiers"], forecast_info["identifiers"])
         self.assertEqual(ecmwf_info["via_device"], ("shmu", "entry-123"))
-        self.assertEqual(ecmwf_info["model"], "ECMWF ENS EPSGRAM Forecast Cache")
+        self.assertEqual(
+            ecmwf_info["name"],
+            "SHMU ECMWF 10-day meteogram 11813",
+        )
+        self.assertEqual(ecmwf_info["model"], "ECMWF 10-day Meteogram Forecast Cache")
         self.assertEqual(
             ecmwf_info["configuration_url"],
-            "https://www.shmu.sk/sk/?page=2673",
+            "https://www.shmu.sk/sk/"
+            "?id=meteo_num_mgram10&nwp_mesto=32737&page=1",
         )
 
 

@@ -5,7 +5,11 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from datetime import datetime, timedelta
 from .cache_paths import forecast_cache_path_for_entry
 from .const import DOMAIN
-from .entity_helpers import forecast_device_info, station_device_info
+from .entity_helpers import (
+    ecmwf_epsgram_device_info,
+    forecast_device_info,
+    station_device_info,
+)
 from .forecast import forecast_summary
 from homeassistant.util.dt import now
 
@@ -206,6 +210,47 @@ class SHMUForecastCacheInfoSensor(CoordinatorEntity, SensorEntity):
                 modified = datetime.fromisoformat(modified_time.replace("Z", "+00:00"))
                 return round(max(0.0, (now() - modified).total_seconds()))
             return round(value)
+        return value
+
+
+class SHMUECMWFMeteogramCacheInfoSensor(CoordinatorEntity, SensorEntity):
+    """ECMWF 10-day meteogram cache diagnostic sensor."""
+
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    def __init__(
+        self,
+        coordinator,
+        info_key: str,
+        name: str,
+        device_class: SensorDeviceClass | None = None,
+        state_class: SensorStateClass | None = None,
+        icon: str | None = None,
+    ):
+        """Initialize an ECMWF meteogram cache diagnostic sensor."""
+        super().__init__(coordinator)
+        self._info_key = info_key
+        self._attr_name = name
+        self._attr_unique_id = (
+            f"{DOMAIN}_{coordinator.config_entry.entry_id}_"
+            f"ecmwf_meteogram_{info_key}"
+        )
+        self._attr_device_class = device_class
+        self._attr_state_class = state_class
+        self._attr_icon = icon
+        self._attr_device_info = ecmwf_epsgram_device_info(coordinator)
+
+    @property
+    def native_value(self):
+        """Return selected ECMWF meteogram cache metadata."""
+        info = self.coordinator.ecmwf_cache_info
+        if not info:
+            return None
+        value = info.get(self._info_key)
+        if self._info_key in {"downloaded_time", "model_run_time"} and isinstance(
+            value, str
+        ):
+            return datetime.fromisoformat(value.replace("Z", "+00:00"))
         return value
 
 
@@ -434,6 +479,43 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
                 None,
                 None,
                 "mdi:identifier",
+            ),
+        ]
+    )
+    sensors.extend(
+        [
+            SHMUECMWFMeteogramCacheInfoSensor(
+                coordinator,
+                "source_filename",
+                "ECMWF meteogram source filename",
+                icon="mdi:file-document-outline",
+            ),
+            SHMUECMWFMeteogramCacheInfoSensor(
+                coordinator,
+                "downloaded_time",
+                "ECMWF meteogram downloaded time",
+                SensorDeviceClass.TIMESTAMP,
+                icon="mdi:download",
+            ),
+            SHMUECMWFMeteogramCacheInfoSensor(
+                coordinator,
+                "row_count",
+                "ECMWF meteogram record count",
+                state_class=SensorStateClass.MEASUREMENT,
+                icon="mdi:table-row",
+            ),
+            SHMUECMWFMeteogramCacheInfoSensor(
+                coordinator,
+                "model_run_time",
+                "ECMWF meteogram model run time",
+                SensorDeviceClass.TIMESTAMP,
+                icon="mdi:clock-start",
+            ),
+            SHMUECMWFMeteogramCacheInfoSensor(
+                coordinator,
+                "source_run_id",
+                "ECMWF meteogram source run",
+                icon="mdi:identifier",
             ),
         ]
     )
