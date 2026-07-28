@@ -4,7 +4,7 @@
   "documentation": "https://github.com/jezek/ha-shmu/blob/main/README.md",
   "issue_tracker": "https://github.com/jezek/ha-shmu/issues",
   "codeowners": ["jezek"],
-  "version": "1.5.11",
+  "version": "1.5.12",
   "minimum_ha_version": "2026.1.0",
   "config_flow": true,
   "dependencies": ["http"],
