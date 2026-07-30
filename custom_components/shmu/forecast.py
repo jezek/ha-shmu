@@ -271,11 +271,20 @@ def rows_as_daily_forecast(
         wind_speeds = [row.wind_speed for row in day_rows if row.wind_speed is not None]
         gusts = [row.wind_gust for row in day_rows if row.wind_gust is not None]
         cloud_cover = [row.cloud_cover for row in day_rows if row.cloud_cover is not None]
-        conditions = [_condition_for_row(row) for row in day_rows]
+        has_rain = any(
+            row.precipitation_amount is not None
+            and row.precipitation_amount >= PRECIPITATION_THRESHOLD_MM
+            for row in day_rows
+        )
+        average_cloud_cover = (
+            sum(cloud_cover) / len(cloud_cover) if cloud_cover else None
+        )
 
         forecast: dict[str, Any] = {
             "datetime": f"{day_key}T12:00:00Z",
-            "condition": _dominant_condition(conditions),
+            "condition": (
+                "rainy" if has_rain else _condition_for_cloud_cover(average_cloud_cover)
+            ),
         }
         if temperatures:
             forecast["temperature"] = max(temperatures)
@@ -287,7 +296,7 @@ def rows_as_daily_forecast(
         if gusts:
             forecast["wind_gust_speed"] = max(gusts)
         if cloud_cover:
-            forecast["cloud_coverage"] = sum(cloud_cover) / len(cloud_cover)
+            forecast["cloud_coverage"] = average_cloud_cover
         forecasts.append(forecast)
     return forecasts
 
@@ -510,19 +519,17 @@ def _condition_for_row(row: ForecastRow) -> str:
         and row.precipitation_amount >= PRECIPITATION_THRESHOLD_MM
     ):
         return "rainy"
-    if row.cloud_cover is None:
+    return _condition_for_cloud_cover(row.cloud_cover)
+
+
+def _condition_for_cloud_cover(cloud_cover: float | None) -> str:
+    """Map a point or daily-average cloud percentage to a weather condition."""
+    if cloud_cover is None:
         return "cloudy"
-    if row.cloud_cover < 20:
+    if cloud_cover < 20:
         return "sunny"
-    if row.cloud_cover < 70:
+    if cloud_cover < 70:
         return "partlycloudy"
-    return "cloudy"
-
-
-def _dominant_condition(conditions: list[str]) -> str:
-    for condition in ("rainy", "cloudy", "partlycloudy", "sunny"):
-        if condition in conditions:
-            return condition
     return "cloudy"
 
 

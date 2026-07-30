@@ -606,6 +606,34 @@ class TestForecastHelperContract(unittest.TestCase):
         self.assertEqual(daily[0]["condition"], "sunny")
         self.assertEqual(daily[0]["precipitation"], 0.24)
 
+    def test_rows_as_daily_forecast_uses_average_cloud_cover_for_condition(self):
+        rows = forecast.parse_helper_forecast(
+            {
+                "model_run_time": "2026-08-01T00:00:00Z",
+                "source_url": "https://example.test/ecmwf.json",
+                "source_run_id": "run",
+                "rows": [
+                    {
+                        "valid_time": (
+                            datetime(2026, 8, 1, tzinfo=timezone.utc)
+                            + timedelta(hours=hour)
+                        )
+                        .isoformat()
+                        .replace("+00:00", "Z"),
+                        "temperature": 20,
+                        "cloud_cover": 75 if hour == 15 else 10,
+                        "precipitation_amount": 0,
+                    }
+                    for hour in range(24)
+                ],
+            }
+        )
+
+        daily = forecast.rows_as_daily_forecast(rows)
+
+        self.assertEqual(daily[0]["condition"], "sunny")
+        self.assertAlmostEqual(daily[0]["cloud_coverage"], 12.708333333333334)
+
     def test_forecast_summary_answers_practical_questions(self):
         rows = forecast.parse_helper_forecast(
             {
