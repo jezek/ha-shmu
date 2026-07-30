@@ -247,9 +247,12 @@ class SHMUECMWFMeteogramCacheInfoSensor(CoordinatorEntity, SensorEntity):
         if not info:
             return None
         value = info.get(self._info_key)
-        if self._info_key in {"downloaded_time", "model_run_time"} and isinstance(
-            value, str
-        ):
+        if self._info_key in {
+            "downloaded_time",
+            "model_run_time",
+            "oldest_valid_time",
+            "newest_valid_time",
+        } and isinstance(value, str):
             return datetime.fromisoformat(value.replace("Z", "+00:00"))
         return value
 
@@ -454,7 +457,7 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
                 coordinator,
                 forecast_cache_path,
                 "oldest_valid_time",
-                "Forecast oldest valid time",
+                "Forecast record from",
                 None,
                 SensorDeviceClass.TIMESTAMP,
                 None,
@@ -464,7 +467,7 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
                 coordinator,
                 forecast_cache_path,
                 "newest_valid_time",
-                "Forecast newest valid time",
+                "Forecast record to",
                 None,
                 SensorDeviceClass.TIMESTAMP,
                 None,
@@ -503,6 +506,20 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
                 "ECMWF meteogram record count",
                 state_class=SensorStateClass.MEASUREMENT,
                 icon="mdi:table-row",
+            ),
+            SHMUECMWFMeteogramCacheInfoSensor(
+                coordinator,
+                "oldest_valid_time",
+                "ECMWF meteogram record from",
+                SensorDeviceClass.TIMESTAMP,
+                icon="mdi:clock-outline",
+            ),
+            SHMUECMWFMeteogramCacheInfoSensor(
+                coordinator,
+                "newest_valid_time",
+                "ECMWF meteogram record to",
+                SensorDeviceClass.TIMESTAMP,
+                icon="mdi:clock-end",
             ),
             SHMUECMWFMeteogramCacheInfoSensor(
                 coordinator,

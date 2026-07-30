@@ -142,6 +142,11 @@ class SHMUECMWFMeteogramWeather(CoordinatorEntity, WeatherEntity):
         """Return no current condition for the forecast-only meteogram surface."""
         return None
 
+    @property
+    def native_temperature(self):
+        """Return the current observed station temperature when available."""
+        return self.coordinator.data.get("t")
+
     async def async_forecast_hourly(self):
         """Return cached ECMWF 10-day meteogram hourly forecast rows."""
         rows = await self.hass.async_add_executor_job(self._load_rows)
