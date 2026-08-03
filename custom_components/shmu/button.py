@@ -28,7 +28,9 @@ class SHMUForecastRefreshButton(CoordinatorEntity, ButtonEntity):
 
     async def async_press(self) -> None:
         """Refresh the ALADIN forecast cache."""
-        result = await self.coordinator._async_refresh_forecast_cache()
+        result = await self.coordinator._async_refresh_forecast_cache(
+            force_refresh=True
+        )
         self.coordinator.async_update_listeners()
         if result is None:
             raise HomeAssistantError("SHMU forecast cache refresh failed")

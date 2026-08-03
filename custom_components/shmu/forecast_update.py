@@ -56,9 +56,15 @@ def read_json_url(source: str, *, timeout: int = 30, opener=None) -> dict[str, A
 def update_forecast_cache_source(
     cache_path: str | Path,
     source: str,
+    *,
+    force_refresh: bool = False,
 ) -> dict[str, Any]:
     """Read a helper payload from source and update the forecast cache."""
-    return update_forecast_cache_payload(cache_path, read_helper_payload(source))
+    return update_forecast_cache_payload(
+        cache_path,
+        read_helper_payload(source),
+        replace_same_run=force_refresh,
+    )
 
 
 def update_forecast_cache_aladin_temperature(
@@ -71,6 +77,7 @@ def update_forecast_cache_aladin_temperature(
     timeout: int = 30,
     verify_ssl: bool = True,
     opener=None,
+    force_refresh: bool = False,
 ) -> dict[str, Any]:
     """Download ALADIN GRIB leads and update the temperature forecast cache."""
     source_run_id = run_id(model_run_time)
@@ -84,6 +91,7 @@ def update_forecast_cache_aladin_temperature(
     if (
         current_info
         and current_info.get("source_run_id") == source_run_id
+        and not force_refresh
         and (
             lead_hours is not None
             or current_info.get("row_count", 0) >= required_row_count
@@ -111,7 +119,7 @@ def update_forecast_cache_aladin_temperature(
     return update_forecast_cache_payload(
         cache_path,
         payload,
-        replace_same_run=lead_hours is None,
+        replace_same_run=lead_hours is None or force_refresh,
     )
 
 
@@ -125,6 +133,7 @@ def update_forecast_cache_latest_aladin_temperature(
     timeout: int = 30,
     verify_ssl: bool = True,
     opener=None,
+    force_refresh: bool = False,
 ) -> dict[str, Any]:
     """Update from the newest published ALADIN run, falling back on HTTP 404."""
     candidate_before = now
@@ -143,6 +152,7 @@ def update_forecast_cache_latest_aladin_temperature(
                 timeout=timeout,
                 verify_ssl=verify_ssl,
                 opener=opener,
+                force_refresh=force_refresh,
             )
         except HTTPError as err:
             if err.code != 404:

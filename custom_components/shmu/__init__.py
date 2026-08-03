@@ -92,7 +92,7 @@ class SHMUDataUpdateCoordinator(DataUpdateCoordinator):
         except Exception as err:
             raise UpdateFailed(f"Error communicating with SHMU API: {err}")
 
-    async def _async_refresh_forecast_cache(self):
+    async def _async_refresh_forecast_cache(self, *, force_refresh: bool = False):
         """Refresh the forecast cache from helper source or native ALADIN data."""
         source = self._entry.options.get(
             CONF_FORECAST_SOURCE,
@@ -107,6 +107,7 @@ class SHMUDataUpdateCoordinator(DataUpdateCoordinator):
             latitude=self._hass.config.latitude,
             longitude=self._hass.config.longitude,
             verify_ssl=self._verify_ssl,
+            force_refresh=force_refresh,
         )
 
         try:

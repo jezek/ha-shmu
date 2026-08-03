@@ -8,7 +8,7 @@ import sys
 import tempfile
 import types
 import unittest
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from urllib.error import HTTPError
 
 
@@ -201,6 +201,26 @@ class TestForecastUpdate(unittest.TestCase):
         self.assertTrue(result["changed"])
         self.assertEqual(result["info"]["source_run_id"], "run-2")
 
+    def test_forced_source_refresh_replaces_same_run(self):
+        forecast_update = _load_forecast_update()
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            source_path = temp_path / "source.json"
+            cache_path = temp_path / "forecast-cache.json"
+            forecast_update.update_forecast_cache_payload(cache_path, _payload())
+            source_path.write_text(
+                json.dumps(_payload(temperature=22.5)), encoding="utf-8"
+            )
+
+            result = forecast_update.update_forecast_cache_source(
+                cache_path, str(source_path), force_refresh=True
+            )
+            written = json.loads(cache_path.read_text(encoding="utf-8"))
+
+        self.assertTrue(result["changed"])
+        self.assertEqual(written["rows"][0]["temperature"], 22.5)
+
     def test_update_forecast_cache_aladin_temperature_downloads_and_writes_cache(self):
         forecast_update = _load_forecast_update()
         calls = []
@@ -363,6 +383,47 @@ class TestForecastUpdate(unittest.TestCase):
 
         self.assertFalse(result["changed"])
         self.assertEqual(unchanged_mtime, original_mtime)
+
+    def test_forced_aladin_refresh_redownloads_and_replaces_complete_same_run(self):
+        forecast_update = _load_forecast_update()
+        calls = []
+
+        def opener(request, timeout):
+            lead = int(request.full_url.split("al-grib_sk_")[1].split("-", 1)[0])
+            calls.append(lead)
+            return _Response(_temperature_message(lead, 295.655 + lead))
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            cache_path = Path(temp_dir) / "forecast-cache.json"
+            source_run_id = "aladin-sk-4.5km-20260803-1200"
+            existing = _payload(source_run_id)
+            existing["rows"] = [
+                {
+                    **existing["rows"][0],
+                    "valid_time": (
+                        datetime(2026, 8, 3, 12, tzinfo=timezone.utc)
+                        + timedelta(hours=lead)
+                    ).isoformat(),
+                    "lead_hours": lead,
+                }
+                for lead in range(73)
+            ]
+            forecast_update.update_forecast_cache_payload(cache_path, existing)
+
+            result = forecast_update.update_forecast_cache_aladin_temperature(
+                cache_path,
+                model_run_time=datetime(2026, 8, 3, 12, tzinfo=timezone.utc),
+                latitude=47.74175,
+                longitude=16.849607,
+                opener=opener,
+                force_refresh=True,
+            )
+            written = json.loads(cache_path.read_text(encoding="utf-8"))
+
+        self.assertTrue(result["changed"])
+        self.assertEqual(calls, list(range(73)))
+        self.assertEqual(len(written["rows"]), 73)
+        self.assertEqual(written["rows"][0]["temperature"], 22.505)
 
     def test_update_forecast_cache_latest_aladin_temperature_selects_latest_run(self):
         forecast_update = _load_forecast_update()

@@ -22,10 +22,16 @@ def forecast_cache_update_job(
     latitude: float,
     longitude: float,
     verify_ssl: bool,
+    force_refresh: bool = False,
 ) -> Callable[[], dict[str, Any]]:
     """Return the executor job for helper-source or native ALADIN refresh."""
     if source:
-        return partial(update_forecast_cache_source, cache_path, source)
+        return partial(
+            update_forecast_cache_source,
+            cache_path,
+            source,
+            force_refresh=force_refresh,
+        )
 
     return partial(
         update_forecast_cache_latest_aladin_temperature,
@@ -34,6 +40,7 @@ def forecast_cache_update_job(
         latitude=latitude,
         longitude=longitude,
         verify_ssl=verify_ssl,
+        force_refresh=force_refresh,
     )
 
 

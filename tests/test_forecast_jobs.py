@@ -45,6 +45,7 @@ class TestForecastJobs(unittest.TestCase):
         self.assertIsInstance(job, partial)
         self.assertIs(job.func, forecast_update.update_forecast_cache_source)
         self.assertEqual(job.args, ("/config/shmu/cache.json", "/config/helper.json"))
+        self.assertEqual(job.keywords, {"force_refresh": False})
 
     def test_forecast_cache_update_job_uses_native_aladin_without_source(self):
         forecast_jobs = _load_module("forecast_jobs")
@@ -73,8 +74,24 @@ class TestForecastJobs(unittest.TestCase):
                 "latitude": 48.1,
                 "longitude": 17.1,
                 "verify_ssl": False,
+                "force_refresh": False,
             },
         )
+
+    def test_forecast_cache_update_job_threads_manual_force_refresh(self):
+        forecast_jobs = _load_module("forecast_jobs")
+
+        job = forecast_jobs.forecast_cache_update_job(
+            "/config/shmu/cache.json",
+            source="",
+            now=datetime(2026, 8, 3, 18, tzinfo=timezone.utc),
+            latitude=48.1,
+            longitude=17.1,
+            verify_ssl=False,
+            force_refresh=True,
+        )
+
+        self.assertTrue(job.keywords["force_refresh"])
 
     def test_ecmwf_meteogram_cache_update_job_uses_ecmwf_updater(self):
         forecast_jobs = _load_module("forecast_jobs")

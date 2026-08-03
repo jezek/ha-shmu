@@ -84,9 +84,11 @@ class _Coordinator:
             {"changed": False} if forecast_result is _DEFAULT_RESULT else forecast_result
         )
         self._ecmwf_result = {"changed": False} if ecmwf_result is _DEFAULT_RESULT else ecmwf_result
+        self.forecast_force_refresh = None
 
-    async def _async_refresh_forecast_cache(self):
+    async def _async_refresh_forecast_cache(self, *, force_refresh=False):
         self.forecast_calls += 1
+        self.forecast_force_refresh = force_refresh
         return self._forecast_result
 
     async def _async_refresh_ecmwf_meteogram_cache(self):
@@ -112,6 +114,7 @@ class TestRefreshButtons(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(entity._attr_device_info["identifiers"], {("shmu", "entry-123_forecast")})
         self.assertEqual(entity._attr_entity_category.value, "diagnostic")
         self.assertEqual(coordinator.forecast_calls, 1)
+        self.assertTrue(coordinator.forecast_force_refresh)
         self.assertEqual(coordinator.listener_updates, 1)
 
     async def test_ecmwf_refresh_button_calls_coordinator(self):

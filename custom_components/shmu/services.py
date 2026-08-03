@@ -112,7 +112,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
     async def refresh_forecast_cache(call: ServiceCall) -> dict[str, Any]:
         entry_data = _entry_data_for_call(hass, call)
         coordinator = entry_data["coordinator"]
-        result = await coordinator._async_refresh_forecast_cache()
+        result = await coordinator._async_refresh_forecast_cache(force_refresh=True)
         coordinator.async_update_listeners()
         if result is None:
             raise HomeAssistantError("SHMU forecast cache refresh failed")
