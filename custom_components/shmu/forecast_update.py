@@ -22,7 +22,7 @@ from .aladin import (
 from .ecmwf_meteogram import ecmwf_meteogram_helper_payload, latest_station_product, product_json_url
 from .forecast import ForecastCache, parse_helper_forecast
 
-DEFAULT_ALADIN_TEMPERATURE_LEAD_HOURS = tuple(range(79))
+DEFAULT_ALADIN_TEMPERATURE_LEAD_HOURS = tuple(range(73))
 FORECAST_CACHE_USER_AGENT = "ha-shmu-forecast-cache/1.0"
 SHMU_ECMWF_STATION_PRODUCTS_URL = (
     "https://www.shmu.sk/api/v1/nwp/getstationproducts?station={station_id}"
@@ -80,7 +80,15 @@ def update_forecast_cache_aladin_temperature(
     except (FileNotFoundError, ValueError):
         current_info = None
 
-    if current_info and current_info.get("source_run_id") == source_run_id:
+    required_row_count = len(DEFAULT_ALADIN_TEMPERATURE_LEAD_HOURS)
+    if (
+        current_info
+        and current_info.get("source_run_id") == source_run_id
+        and (
+            lead_hours is not None
+            or current_info.get("row_count", 0) >= required_row_count
+        )
+    ):
         return {"changed": False, "info": current_info}
 
     selected_opener = opener if opener is not None else opener_for_verify_ssl(verify_ssl)
@@ -97,10 +105,14 @@ def update_forecast_cache_aladin_temperature(
             else lead_hours,
             timeout=timeout,
             opener=selected_opener,
-            stop_at_first_not_found=lead_hours is None,
+            stop_at_first_not_found=False,
         ),
     )
-    return update_forecast_cache_payload(cache_path, payload)
+    return update_forecast_cache_payload(
+        cache_path,
+        payload,
+        replace_same_run=lead_hours is None,
+    )
 
 
 def update_forecast_cache_latest_aladin_temperature(
@@ -167,6 +179,8 @@ def update_forecast_cache_latest_ecmwf_meteogram(
 def update_forecast_cache_payload(
     cache_path: str | Path,
     payload: dict[str, Any],
+    *,
+    replace_same_run: bool = False,
 ) -> dict[str, Any]:
     """Validate and write a helper payload unless the cached run is unchanged."""
     parse_helper_forecast(payload)
@@ -178,7 +192,11 @@ def update_forecast_cache_payload(
     except (FileNotFoundError, ValueError):
         current_info = None
 
-    if current_info and current_info.get("source_run_id") == incoming_run_id:
+    if (
+        current_info
+        and current_info.get("source_run_id") == incoming_run_id
+        and not replace_same_run
+    ):
         return {"changed": False, "info": current_info}
 
     cache.save_payload(payload)
