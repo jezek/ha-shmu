@@ -578,6 +578,38 @@ class TestForecastHelperContract(unittest.TestCase):
         self.assertEqual(daily[-1]["templow"], 46.0)
         self.assertEqual(daily[-1]["temperature"], 69.0)
 
+    def test_five_row_partial_aladin_run_has_no_daily_forecast_until_complete(self):
+        model_run_time = datetime(2026, 8, 3, 12, tzinfo=timezone.utc)
+
+        def rows_for_count(count):
+            return forecast.parse_helper_forecast(
+                {
+                    "model_run_time": model_run_time.isoformat(),
+                    "source_url": "https://opendata.shmu.sk/meteorology/weather/nwp/aladin/sk/4.5km/20260803/1200",
+                    "source_run_id": "aladin-sk-4.5km-20260803-1200",
+                    "rows": [
+                        {
+                            "valid_time": (
+                                model_run_time + timedelta(hours=lead)
+                            ).isoformat(),
+                            "lead_hours": lead,
+                            "temperature": 20.0 + lead / 10,
+                            "cloud_cover": 40.0,
+                        }
+                        for lead in range(count)
+                    ],
+                }
+            )
+
+        partial_daily = forecast.rows_as_daily_forecast(rows_for_count(5))
+        complete_daily = forecast.rows_as_daily_forecast(rows_for_count(73))
+
+        self.assertEqual(partial_daily, [])
+        self.assertEqual(
+            [item["datetime"] for item in complete_daily],
+            ["2026-08-04T12:00:00Z", "2026-08-05T12:00:00Z"],
+        )
+
     def test_rows_as_daily_forecast_ignores_trace_precipitation_for_condition(self):
         rows = forecast.parse_helper_forecast(
             {
