@@ -13,6 +13,7 @@ from urllib.request import Request, urlopen
 
 from .aladin import (
     download_grib_leads,
+    expected_lead_hours,
     forecast_payload_from_grib_leads,
     latest_model_run_time,
     opener_for_verify_ssl,
@@ -22,7 +23,6 @@ from .aladin import (
 from .ecmwf_meteogram import ecmwf_meteogram_helper_payload, latest_station_product, product_json_url
 from .forecast import ForecastCache, parse_helper_forecast
 
-DEFAULT_ALADIN_TEMPERATURE_LEAD_HOURS = tuple(range(73))
 FORECAST_CACHE_USER_AGENT = "ha-shmu-forecast-cache/1.0"
 SHMU_ECMWF_STATION_PRODUCTS_URL = (
     "https://www.shmu.sk/api/v1/nwp/getstationproducts?station={station_id}"
@@ -87,7 +87,8 @@ def update_forecast_cache_aladin_temperature(
     except (FileNotFoundError, ValueError):
         current_info = None
 
-    required_row_count = len(DEFAULT_ALADIN_TEMPERATURE_LEAD_HOURS)
+    required_lead_hours = expected_lead_hours(model_run_time)
+    required_row_count = len(required_lead_hours)
     if (
         current_info
         and current_info.get("source_run_id") == source_run_id
@@ -108,7 +109,7 @@ def update_forecast_cache_aladin_temperature(
         longitude=longitude,
         grib_leads=download_grib_leads(
             model_run_time,
-            DEFAULT_ALADIN_TEMPERATURE_LEAD_HOURS
+            required_lead_hours
             if lead_hours is None
             else lead_hours,
             timeout=timeout,

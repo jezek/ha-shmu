@@ -228,6 +228,34 @@ class TestAladin(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "negative"):
             aladin.grib_url(datetime(2026, 6, 13, 12, tzinfo=timezone.utc), -1)
 
+    def test_expected_lead_hours_uses_issue_hour_horizon(self):
+        aladin = _load_module("aladin")
+
+        self.assertEqual(
+            aladin.expected_lead_hours(
+                datetime(2026, 8, 4, 0, tzinfo=timezone.utc)
+            ),
+            tuple(range(103)),
+        )
+        for run_hour in (6, 12, 18):
+            with self.subTest(run_hour=run_hour):
+                self.assertEqual(
+                    aladin.expected_lead_hours(
+                        datetime(2026, 8, 4, run_hour, tzinfo=timezone.utc)
+                    ),
+                    tuple(range(73)),
+                )
+
+    def test_expected_lead_hours_rejects_unknown_issue_hour(self):
+        aladin = _load_module("aladin")
+
+        with self.assertRaisesRegex(
+            ValueError, "no expected ALADIN forecast horizon for 03 UTC run"
+        ):
+            aladin.expected_lead_hours(
+                datetime(2026, 8, 4, 3, tzinfo=timezone.utc)
+            )
+
     def test_download_grib_lead_uses_opendata_url_and_user_agent(self):
         aladin = _load_module("aladin")
         calls = []

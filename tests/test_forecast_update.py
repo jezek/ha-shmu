@@ -269,6 +269,27 @@ class TestForecastUpdate(unittest.TestCase):
 
         self.assertEqual(calls, list(range(73)))
 
+    def test_update_forecast_cache_aladin_temperature_uses_extended_00utc_horizon(self):
+        forecast_update = _load_forecast_update()
+        calls = []
+
+        def opener(request, timeout):
+            lead = int(request.full_url.split("al-grib_sk_")[1].split("-", 1)[0])
+            calls.append(lead)
+            return _Response(_temperature_message(lead, 294.655 + lead))
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            result = forecast_update.update_forecast_cache_aladin_temperature(
+                Path(temp_dir) / "forecast-cache.json",
+                model_run_time=datetime(2026, 8, 4, 0, tzinfo=timezone.utc),
+                latitude=47.74175,
+                longitude=16.849607,
+                opener=opener,
+            )
+
+        self.assertTrue(result["changed"])
+        self.assertEqual(calls, list(range(103)))
+
     def test_update_forecast_cache_aladin_temperature_rejects_incomplete_default_run(self):
         forecast_update = _load_forecast_update()
         calls = []

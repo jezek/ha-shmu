@@ -68,6 +68,30 @@ CLOUD_COVER_SELECTOR = {
 }
 DEFAULT_RUN_HOURS = (0, 6, 12, 18)
 DEFAULT_RUN_AVAILABILITY_LAG = timedelta(hours=6)
+ALADIN_SK_FORECAST_HORIZON_BY_RUN_HOUR = {
+    0: 102,
+    6: 72,
+    12: 72,
+    18: 72,
+}
+
+
+def expected_lead_hours(model_run_time: datetime) -> tuple[int, ...]:
+    """Return the evidence-backed complete lead range for an ALADIN run.
+
+    SHMU's published metadata describes the fields but does not declare a
+    per-run horizon. Its retained OpenData directories consistently publish
+    00 UTC runs through lead 102 and 06/12/18 UTC runs through lead 72.
+    Unknown issue hours fail closed instead of guessing a shorter horizon.
+    """
+    run_hour = _as_utc(model_run_time).hour
+    try:
+        final_lead = ALADIN_SK_FORECAST_HORIZON_BY_RUN_HOUR[run_hour]
+    except KeyError as error:
+        raise ValueError(
+            f"no expected ALADIN forecast horizon for {run_hour:02d} UTC run"
+        ) from error
+    return tuple(range(final_lead + 1))
 
 
 def grib_url(model_run_time: datetime, lead_hours: int) -> str:
