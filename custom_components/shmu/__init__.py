@@ -13,7 +13,11 @@ from .cache_paths import (
 from .const import CONF_FORECAST_SOURCE, DOMAIN
 from .api import SHMUAPI
 from .forecast import ForecastCache
-from .forecast_jobs import ecmwf_meteogram_cache_update_job, forecast_cache_update_job
+from .forecast_jobs import (
+    ecmwf_meteogram_cache_update_job,
+    forecast_cache_update_job,
+    leading_day_aladin_fallback_job,
+)
 from .registry_migration import async_migrate_legacy_ecmwf_registry
 from .services import async_setup_services, async_unload_services
 
@@ -62,6 +66,7 @@ class SHMUDataUpdateCoordinator(DataUpdateCoordinator):
         self._api = SHMUAPI(self._station_id, self._verify_ssl)
         self.forecast_rows = []
         self.forecast_historical_temperatures = {}
+        self.forecast_history_info = {}
         self.forecast_cache_info = {}
         self.ecmwf_forecast_rows = []
         self.ecmwf_cache_info = {}
@@ -128,6 +133,7 @@ class SHMUDataUpdateCoordinator(DataUpdateCoordinator):
     async def _async_refresh_forecast_history(self) -> None:
         """Load only history needed to complete the leading forecast boundary."""
         self.forecast_historical_temperatures = {}
+        self.forecast_history_info = {}
         if not self.forecast_rows:
             return
         first_valid_time = min(row.valid_time for row in self.forecast_rows)
@@ -142,8 +148,37 @@ class SHMUDataUpdateCoordinator(DataUpdateCoordinator):
                 day_start,
                 first_valid_time,
             )
+            self.forecast_history_info = {
+                "source": "observed_station_history",
+                "hour_count": len(self.forecast_historical_temperatures),
+            }
         except Exception as err:
             _LOGGER.warning("Unable to complete leading SHMU forecast day: %s", err)
+            source = self._entry.options.get(
+                CONF_FORECAST_SOURCE,
+                self._entry.data.get(CONF_FORECAST_SOURCE),
+            )
+            if source:
+                return
+            try:
+                result = await self._hass.async_add_executor_job(
+                    leading_day_aladin_fallback_job(
+                        model_run_time=first_valid_time,
+                        latitude=self._hass.config.latitude,
+                        longitude=self._hass.config.longitude,
+                        verify_ssl=self._verify_ssl,
+                    )
+                )
+                self.forecast_historical_temperatures = result["temperatures"]
+                self.forecast_history_info = result["info"]
+                _LOGGER.warning(
+                    "Completed leading SHMU forecast day from %s",
+                    self.forecast_history_info.get("source_run_id"),
+                )
+            except Exception as fallback_err:
+                _LOGGER.warning(
+                    "Unable to use ALADIN leading-day fallback: %s", fallback_err
+                )
 
     async def _async_refresh_ecmwf_meteogram_cache(self, station_id: str | None = None):
         """Refresh the separate ECMWF 10-day meteogram cache on explicit request."""

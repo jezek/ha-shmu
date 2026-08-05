@@ -269,6 +269,44 @@ class TestForecastUpdate(unittest.TestCase):
 
         self.assertEqual(calls, list(range(73)))
 
+    def test_leading_day_aladin_temperature_fallback_uses_same_day_00utc_run(self):
+        forecast_update = _load_forecast_update()
+        calls = []
+
+        def opener(request, timeout):
+            lead = int(request.full_url.split("al-grib_sk_")[1].split("-", 1)[0])
+            calls.append((request.full_url, lead))
+            return _Response(_temperature_message(lead, 273.15 + 10 + lead))
+
+        result = forecast_update.leading_day_aladin_temperature_fallback(
+            model_run_time=datetime(2026, 8, 5, 12, tzinfo=timezone.utc),
+            latitude=48.289,
+            longitude=17.267,
+            opener=opener,
+        )
+
+        self.assertEqual([lead for _, lead in calls], list(range(12)))
+        self.assertTrue(all("/20260805/0000/" in url for url, _ in calls))
+        self.assertEqual(result["info"]["source"], "aladin_leading_day_fallback")
+        self.assertEqual(
+            result["info"]["source_run_id"], "aladin-sk-4.5km-20260805-0000"
+        )
+        self.assertEqual(len(result["temperatures"]), 12)
+        self.assertEqual(
+            result["temperatures"][datetime(2026, 8, 5, tzinfo=timezone.utc)],
+            10.0,
+        )
+
+    def test_leading_day_aladin_temperature_fallback_rejects_nonstandard_run(self):
+        forecast_update = _load_forecast_update()
+
+        with self.assertRaisesRegex(ValueError, "compatible ALADIN run"):
+            forecast_update.leading_day_aladin_temperature_fallback(
+                model_run_time=datetime(2026, 8, 5, 9, tzinfo=timezone.utc),
+                latitude=48.289,
+                longitude=17.267,
+            )
+
     def test_update_forecast_cache_aladin_temperature_uses_extended_00utc_horizon(self):
         forecast_update = _load_forecast_update()
         calls = []

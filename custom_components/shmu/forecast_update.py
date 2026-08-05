@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Iterable
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
@@ -19,6 +19,7 @@ from .aladin import (
     opener_for_verify_ssl,
     run_id,
     run_url,
+    temperature_payload_from_grib_leads,
 )
 from .ecmwf_meteogram import ecmwf_meteogram_helper_payload, latest_station_product, product_json_url
 from .forecast import ForecastCache, parse_helper_forecast
@@ -27,6 +28,62 @@ FORECAST_CACHE_USER_AGENT = "ha-shmu-forecast-cache/1.0"
 SHMU_ECMWF_STATION_PRODUCTS_URL = (
     "https://www.shmu.sk/api/v1/nwp/getstationproducts?station={station_id}"
 )
+
+
+def leading_day_aladin_temperature_fallback(
+    *,
+    model_run_time: datetime,
+    latitude: float,
+    longitude: float,
+    timeout: int = 30,
+    verify_ssl: bool = True,
+    opener=None,
+) -> dict[str, Any]:
+    """Fetch contiguous leading-day temperatures from the compatible 00 UTC run."""
+    if model_run_time.tzinfo is None:
+        raise ValueError("model_run_time must be timezone-aware")
+    current_run = model_run_time.astimezone(timezone.utc).replace(
+        minute=0, second=0, microsecond=0
+    )
+    if current_run.hour not in {6, 12, 18}:
+        raise ValueError("no compatible ALADIN run for leading-day fallback")
+
+    fallback_run = current_run.replace(hour=0)
+    needed_leads = tuple(range(current_run.hour))
+    selected_opener = opener if opener is not None else opener_for_verify_ssl(verify_ssl)
+    payload = temperature_payload_from_grib_leads(
+        model_run_time=fallback_run,
+        source_url=run_url(fallback_run),
+        source_run_id=run_id(fallback_run),
+        latitude=latitude,
+        longitude=longitude,
+        grib_leads=download_grib_leads(
+            fallback_run,
+            needed_leads,
+            timeout=timeout,
+            opener=selected_opener,
+            stop_at_first_not_found=False,
+        ),
+    )
+    rows = parse_helper_forecast(payload)
+    expected_times = {fallback_run + timedelta(hours=lead) for lead in needed_leads}
+    temperatures = {
+        row.valid_time: row.temperature
+        for row in rows
+        if row.valid_time in expected_times and row.temperature is not None
+    }
+    if set(temperatures) != expected_times:
+        raise ValueError("incomplete ALADIN leading-day temperature fallback")
+    return {
+        "temperatures": temperatures,
+        "info": {
+            "source": "aladin_leading_day_fallback",
+            "source_run_id": payload["source_run_id"],
+            "oldest_valid_time": min(expected_times).isoformat(),
+            "newest_valid_time": max(expected_times).isoformat(),
+            "hour_count": len(expected_times),
+        },
+    }
 
 
 def read_helper_payload(source: str) -> dict[str, Any]:

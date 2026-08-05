@@ -213,6 +213,27 @@ class SHMUForecastCacheInfoSensor(CoordinatorEntity, SensorEntity):
         return value
 
 
+class SHMUForecastHistoryInfoSensor(CoordinatorEntity, SensorEntity):
+    """Diagnostic sensor exposing leading-day temperature provenance."""
+
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    def __init__(self, coordinator, info_key: str, name: str, icon: str):
+        super().__init__(coordinator)
+        self._info_key = info_key
+        self._attr_name = name
+        self._attr_unique_id = (
+            f"{DOMAIN}_{coordinator.config_entry.entry_id}_forecast_history_{info_key}"
+        )
+        self._attr_icon = icon
+        self._attr_device_info = forecast_device_info(coordinator)
+
+    @property
+    def native_value(self):
+        """Return selected leading-day history metadata."""
+        return self.coordinator.forecast_history_info.get(self._info_key)
+
+
 class SHMUECMWFMeteogramCacheInfoSensor(CoordinatorEntity, SensorEntity):
     """ECMWF 10-day meteogram cache diagnostic sensor."""
 
@@ -481,6 +502,18 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
                 None,
                 None,
                 None,
+                "mdi:identifier",
+            ),
+            SHMUForecastHistoryInfoSensor(
+                coordinator,
+                "source",
+                "Forecast leading-day temperature source",
+                "mdi:source-branch",
+            ),
+            SHMUForecastHistoryInfoSensor(
+                coordinator,
+                "source_run_id",
+                "Forecast leading-day fallback run",
                 "mdi:identifier",
             ),
         ]

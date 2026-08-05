@@ -638,6 +638,41 @@ class TestForecastHelperContract(unittest.TestCase):
             ["2026-08-05T12:00:00Z", "2026-08-06T12:00:00Z"],
         )
 
+    def test_20260805_1200_fallback_yields_three_days_without_trailing_day(self):
+        model_run_time = datetime(2026, 8, 5, 12, tzinfo=timezone.utc)
+        rows = forecast.parse_helper_forecast(
+            {
+                "model_run_time": model_run_time.isoformat(),
+                "source_url": "https://opendata.shmu.sk/aladin/20260805/1200",
+                "source_run_id": "aladin-sk-4.5km-20260805-1200",
+                "rows": [
+                    {
+                        "valid_time": (model_run_time + timedelta(hours=lead)).isoformat(),
+                        "lead_hours": lead,
+                        "temperature": 20.0 + lead / 10,
+                        "cloud_cover": 40.0,
+                    }
+                    for lead in range(73)
+                ],
+            }
+        )
+        fallback = {
+            model_run_time.replace(hour=hour): 12.0 + hour / 10
+            for hour in range(12)
+        }
+
+        daily = forecast.rows_as_daily_forecast(rows, fallback)
+
+        self.assertEqual(
+            [item["datetime"] for item in daily],
+            [
+                "2026-08-05T12:00:00Z",
+                "2026-08-06T12:00:00Z",
+                "2026-08-07T12:00:00Z",
+            ],
+        )
+        self.assertEqual(daily[0]["templow"], 12.0)
+
     def test_rows_as_daily_forecast_ignores_trace_precipitation_for_condition(self):
         rows = forecast.parse_helper_forecast(
             {

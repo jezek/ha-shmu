@@ -81,6 +81,7 @@ def _load_coordinator_module():
         "forecast_jobs": {
             "ecmwf_meteogram_cache_update_job": Mock(),
             "forecast_cache_update_job": Mock(),
+            "leading_day_aladin_fallback_job": Mock(),
         },
         "registry_migration": {
             "async_migrate_legacy_ecmwf_registry": AsyncMock(),
@@ -143,6 +144,59 @@ class TestCoordinatorForecastLifecycle(unittest.IsolatedAsyncioTestCase):
         coordinator._async_refresh_forecast_cache.assert_awaited_once_with()
         coordinator._async_refresh_ecmwf_meteogram_cache.assert_awaited_once_with()
         coordinator.async_update_listeners.assert_called_once_with()
+
+    async def test_history_gap_uses_native_aladin_leading_day_fallback(self):
+        coordinator_module = _load_coordinator_module()
+        coordinator = object.__new__(coordinator_module.SHMUDataUpdateCoordinator)
+        first = __import__("datetime").datetime(2026, 8, 5, 12, tzinfo=__import__("datetime").timezone.utc)
+        coordinator.forecast_rows = [types.SimpleNamespace(valid_time=first)]
+        coordinator.forecast_historical_temperatures = {}
+        coordinator.forecast_history_info = {}
+        coordinator._api = types.SimpleNamespace(
+            fetch_temperature_history=AsyncMock(side_effect=ValueError("missing hour"))
+        )
+        coordinator._entry = types.SimpleNamespace(options={}, data={})
+        coordinator._verify_ssl = True
+        fallback = {
+            "temperatures": {first.replace(hour=hour): 10.0 + hour for hour in range(12)},
+            "info": {"source": "aladin_leading_day_fallback"},
+        }
+        coordinator._hass = types.SimpleNamespace(
+            config=types.SimpleNamespace(latitude=48.289, longitude=17.267),
+            async_add_executor_job=AsyncMock(return_value=fallback),
+        )
+
+        await coordinator._async_refresh_forecast_history()
+
+        self.assertEqual(len(coordinator.forecast_historical_temperatures), 12)
+        self.assertEqual(
+            coordinator.forecast_history_info["source"],
+            "aladin_leading_day_fallback",
+        )
+
+    async def test_history_gap_does_not_use_aladin_fallback_for_helper_source(self):
+        coordinator_module = _load_coordinator_module()
+        coordinator = object.__new__(coordinator_module.SHMUDataUpdateCoordinator)
+        first = __import__("datetime").datetime(2026, 8, 5, 12, tzinfo=__import__("datetime").timezone.utc)
+        coordinator.forecast_rows = [types.SimpleNamespace(valid_time=first)]
+        coordinator.forecast_historical_temperatures = {}
+        coordinator.forecast_history_info = {}
+        coordinator._api = types.SimpleNamespace(
+            fetch_temperature_history=AsyncMock(side_effect=ValueError("missing hour"))
+        )
+        coordinator._entry = types.SimpleNamespace(
+            options={"forecast_source": "/tmp/helper.json"}, data={}
+        )
+        coordinator._verify_ssl = True
+        coordinator._hass = types.SimpleNamespace(
+            config=types.SimpleNamespace(latitude=48.289, longitude=17.267),
+            async_add_executor_job=AsyncMock(),
+        )
+
+        await coordinator._async_refresh_forecast_history()
+
+        coordinator._hass.async_add_executor_job.assert_not_awaited()
+        self.assertEqual(coordinator.forecast_historical_temperatures, {})
 
 
 if __name__ == "__main__":
