@@ -69,6 +69,11 @@ class SHMUWeather(CoordinatorEntity, WeatherEntity):
         return self.coordinator.data.get("tlak")
 
     @property
+    def native_humidity(self):
+        """Return current observed relative humidity."""
+        return self.coordinator.data.get("vlh_rel")
+
+    @property
     def native_wind_speed(self):
         """Return current observed wind speed."""
         return self.coordinator.data.get("vie_pr_rych")
@@ -139,13 +144,38 @@ class SHMUECMWFMeteogramWeather(CoordinatorEntity, WeatherEntity):
 
     @property
     def condition(self) -> str | None:
-        """Return no current condition for the forecast-only meteogram surface."""
-        return None
+        """Return observed rain or the nearest fresh ECMWF condition."""
+        return current_condition(
+            self.coordinator.ecmwf_forecast_rows,
+            datetime.now(timezone.utc),
+            self.coordinator.data.get("zra_uhrn"),
+            is_daytime_at=lambda valid_time: is_up(self.hass, valid_time),
+        )
 
     @property
     def native_temperature(self):
         """Return the current observed station temperature when available."""
         return self.coordinator.data.get("t")
+
+    @property
+    def native_pressure(self):
+        """Return current observed pressure."""
+        return self.coordinator.data.get("tlak")
+
+    @property
+    def native_humidity(self):
+        """Return current observed relative humidity."""
+        return self.coordinator.data.get("vlh_rel")
+
+    @property
+    def native_wind_speed(self):
+        """Return current observed wind speed."""
+        return self.coordinator.data.get("vie_pr_rych")
+
+    @property
+    def wind_bearing(self):
+        """Return current observed wind bearing."""
+        return self.coordinator.data.get("vie_pr_smer")
 
     async def async_forecast_hourly(self):
         """Return cached ECMWF 10-day meteogram hourly forecast rows."""
