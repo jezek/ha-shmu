@@ -70,7 +70,7 @@ class SHMUWeather(CoordinatorEntity, WeatherEntity):
         return self.coordinator.data.get("tlak")
 
     @property
-    def native_humidity(self):
+    def humidity(self):
         """Return current observed relative humidity."""
         return self.coordinator.data.get("vlh_rel")
 
@@ -175,7 +175,7 @@ class SHMUECMWFMeteogramWeather(CoordinatorEntity, WeatherEntity):
         return self.coordinator.data.get("tlak")
 
     @property
-    def native_humidity(self):
+    def humidity(self):
         """Return current observed relative humidity."""
         return self.coordinator.data.get("vlh_rel")
 

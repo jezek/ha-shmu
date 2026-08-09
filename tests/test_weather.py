@@ -114,7 +114,7 @@ class TestECMWFWeather(unittest.TestCase):
 
         self.assertEqual(entity.native_temperature, 21.5)
         self.assertEqual(entity.native_pressure, 1012.4)
-        self.assertEqual(entity.native_humidity, 67.0)
+        self.assertEqual(entity.humidity, 67.0)
         self.assertEqual(entity.native_wind_speed, 2.3)
         self.assertEqual(entity.native_wind_gust_speed, 4.8)
         self.assertEqual(entity.wind_bearing, 245.0)
