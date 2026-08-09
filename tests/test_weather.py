@@ -88,7 +88,9 @@ class _Coordinator:
         "tlak": 1012.4,
         "vlh_rel": 67.0,
         "vie_pr_rych": 2.3,
+        "vie_max_rych": 4.8,
         "vie_pr_smer": 245.0,
+        "dohl": 20000.0,
         "zra_uhrn": 0.0,
     }
     ecmwf_forecast_rows = [object()]
@@ -114,7 +116,10 @@ class TestECMWFWeather(unittest.TestCase):
         self.assertEqual(entity.native_pressure, 1012.4)
         self.assertEqual(entity.native_humidity, 67.0)
         self.assertEqual(entity.native_wind_speed, 2.3)
+        self.assertEqual(entity.native_wind_gust_speed, 4.8)
         self.assertEqual(entity.wind_bearing, 245.0)
+        self.assertEqual(entity.native_visibility, 20000.0)
+        self.assertEqual(entity._attr_native_visibility_unit, "m")
 
 
 if __name__ == "__main__":

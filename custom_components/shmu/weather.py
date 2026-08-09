@@ -33,6 +33,7 @@ class SHMUWeather(CoordinatorEntity, WeatherEntity):
     )
     _attr_native_temperature_unit = "°C"
     _attr_native_pressure_unit = "hPa"
+    _attr_native_visibility_unit = "m"
     _attr_native_wind_speed_unit = "m/s"
     _attr_native_precipitation_unit = "mm"
 
@@ -79,9 +80,19 @@ class SHMUWeather(CoordinatorEntity, WeatherEntity):
         return self.coordinator.data.get("vie_pr_rych")
 
     @property
+    def native_wind_gust_speed(self):
+        """Return the current observed one-minute maximum wind speed."""
+        return self.coordinator.data.get("vie_max_rych")
+
+    @property
     def wind_bearing(self):
         """Return current observed wind bearing."""
         return self.coordinator.data.get("vie_pr_smer")
+
+    @property
+    def native_visibility(self):
+        """Return current observed meteorological optical range."""
+        return self.coordinator.data.get("dohl")
 
     async def async_forecast_hourly(self):
         """Return cached hourly forecast rows."""
@@ -122,6 +133,7 @@ class SHMUECMWFMeteogramWeather(CoordinatorEntity, WeatherEntity):
     )
     _attr_native_temperature_unit = "°C"
     _attr_native_pressure_unit = "hPa"
+    _attr_native_visibility_unit = "m"
     _attr_native_wind_speed_unit = "m/s"
     _attr_native_precipitation_unit = "mm"
 
@@ -173,9 +185,19 @@ class SHMUECMWFMeteogramWeather(CoordinatorEntity, WeatherEntity):
         return self.coordinator.data.get("vie_pr_rych")
 
     @property
+    def native_wind_gust_speed(self):
+        """Return the current observed one-minute maximum wind speed."""
+        return self.coordinator.data.get("vie_max_rych")
+
+    @property
     def wind_bearing(self):
         """Return current observed wind bearing."""
         return self.coordinator.data.get("vie_pr_smer")
+
+    @property
+    def native_visibility(self):
+        """Return current observed meteorological optical range."""
+        return self.coordinator.data.get("dohl")
 
     async def async_forecast_hourly(self):
         """Return cached ECMWF 10-day meteogram hourly forecast rows."""
