@@ -90,7 +90,18 @@ class SHMUDataUpdateCoordinator(DataUpdateCoordinator):
         """Fetch data from SHMU API."""
         try:
             session = async_get_clientsession(self._hass)
-            data = await self._api.fetch_data(session)
+            try:
+                data = await self._api.fetch_data(session)
+            except Exception as err:
+                previous_data = getattr(self, "data", None)
+                if not previous_data:
+                    raise
+                _LOGGER.warning(
+                    "Unable to refresh SHMU current observations; preserving "
+                    "the last valid station data: %s",
+                    err,
+                )
+                data = previous_data
             await self._async_refresh_forecast_cache()
             await self._async_refresh_ecmwf_meteogram_cache()
             return data

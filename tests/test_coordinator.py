@@ -132,6 +132,40 @@ class TestCoordinatorForecastLifecycle(unittest.IsolatedAsyncioTestCase):
         coordinator._async_refresh_forecast_cache.assert_awaited_once_with()
         coordinator._async_refresh_ecmwf_meteogram_cache.assert_awaited_once_with()
 
+    async def test_update_preserves_valid_station_data_during_transient_station_miss(self):
+        coordinator_module = _load_coordinator_module()
+        coordinator = object.__new__(coordinator_module.SHMUDataUpdateCoordinator)
+        coordinator._hass = object()
+        coordinator.data = {"t": 21.5, "minuta": "2026-08-05T22:32:00"}
+        coordinator._api = types.SimpleNamespace(
+            fetch_data=AsyncMock(side_effect=ValueError("station missing"))
+        )
+        coordinator._async_refresh_forecast_cache = AsyncMock()
+        coordinator._async_refresh_ecmwf_meteogram_cache = AsyncMock(return_value=None)
+
+        result = await coordinator._async_update_data()
+
+        self.assertIs(result, coordinator.data)
+        coordinator._async_refresh_forecast_cache.assert_awaited_once_with()
+        coordinator._async_refresh_ecmwf_meteogram_cache.assert_awaited_once_with()
+
+    async def test_initial_station_miss_remains_a_failed_update(self):
+        coordinator_module = _load_coordinator_module()
+        coordinator = object.__new__(coordinator_module.SHMUDataUpdateCoordinator)
+        coordinator._hass = object()
+        coordinator.data = None
+        coordinator._api = types.SimpleNamespace(
+            fetch_data=AsyncMock(side_effect=ValueError("station missing"))
+        )
+        coordinator._async_refresh_forecast_cache = AsyncMock()
+        coordinator._async_refresh_ecmwf_meteogram_cache = AsyncMock(return_value=None)
+
+        with self.assertRaises(coordinator_module.UpdateFailed):
+            await coordinator._async_update_data()
+
+        coordinator._async_refresh_forecast_cache.assert_not_awaited()
+        coordinator._async_refresh_ecmwf_meteogram_cache.assert_not_awaited()
+
     async def test_midnight_refreshes_both_forecasts_and_notifies_entities(self):
         coordinator_module = _load_coordinator_module()
         coordinator = object.__new__(coordinator_module.SHMUDataUpdateCoordinator)
