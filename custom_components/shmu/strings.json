@@ -5,9 +5,13 @@
   },
   "configuration": {
     "sk": {
-      "location_id": {
+      "location_name": {
         "name": "Lokalita",
-        "description": "Vyberte lokalitu predpovede. Ak má viac pozorovacích staníc, vyberiete ju v ďalšom kroku."
+        "description": "Zadajte názov lokality. Ak vyhľadávanie nájde viac možností, vyberiete konkrétnu lokalitu v ďalšom kroku."
+      },
+      "location_id": {
+        "name": "Konkrétna lokalita",
+        "description": "Vyberte jednu z lokalít nájdených podľa zadaného názvu."
       },
       "station_id": {
         "name": "Pozorovacia stanica",
@@ -19,9 +23,13 @@
       }
     },
     "en": {
-      "location_id": {
+      "location_name": {
         "name": "Location",
-        "description": "Choose a forecast location. If it has multiple observation stations, you will select one in the next step."
+        "description": "Enter a location name. If the search finds multiple choices, you will select the exact location in the next step."
+      },
+      "location_id": {
+        "name": "Exact location",
+        "description": "Choose one of the locations found for the entered name."
       },
       "station_id": {
         "name": "Observation station",

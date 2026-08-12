@@ -4,12 +4,19 @@ from homeassistant import config_entries
 from homeassistant.core import callback
 from homeassistant.data_entry_flow import FlowResult
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.selector import (
+    SelectOptionDict,
+    SelectSelector,
+    SelectSelectorConfig,
+    SelectSelectorMode,
+)
 import voluptuous as vol
 
 from .const import DOMAIN
 from .location_catalog import (
     LocationOption,
     async_fetch_location_catalog,
+    location_candidates_for_query,
     station_candidates_for_location,
 )
 
@@ -24,6 +31,7 @@ class SHMUConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self._stations: list[LocationOption] = []
         self._locations: list[LocationOption] = []
         self._selected_location: LocationOption | None = None
+        self._location_candidates: list[LocationOption] = []
         self._verify_ssl = True
 
     async def async_step_user(self, user_input=None):
@@ -34,16 +42,14 @@ class SHMUConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 await self._async_load_catalog()
             except Exception:
                 return self._show_user_form(errors={"base": "cannot_connect"})
-            self._selected_location = next(
-                (
-                    location
-                    for location in self._locations
-                    if location.value == user_input["location_id"]
-                ),
-                None,
+            self._location_candidates = location_candidates_for_query(
+                user_input["location_name"], self._locations
             )
-            if self._selected_location is None:
+            if not self._location_candidates:
                 return self._show_user_form(errors={"base": "invalid_location"})
+            if len(self._location_candidates) > 1:
+                return await self.async_step_location()
+            self._selected_location = self._location_candidates[0]
             candidates = station_candidates_for_location(
                 self._selected_location, self._stations
             )
@@ -58,16 +64,52 @@ class SHMUConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         return self._show_user_form(errors={})
 
     def _show_user_form(self, errors):
-        choices = {location.value: location.label for location in self._locations}
-        location_key = vol.Required("location_id")
-        if "31396" in choices:
-            location_key = vol.Required("location_id", default="31396")
         return self.async_show_form(
             step_id="user",
             data_schema=vol.Schema(
                 {
-                    location_key: vol.In(choices),
+                    vol.Required("location_name", default="Pezinok"): str,
                     vol.Optional("verify_ssl", default=True): bool,
+                }
+            ),
+            errors=errors,
+        )
+
+    async def async_step_location(self, user_input=None):
+        """Select one locality after a non-unique name search."""
+        choices = [
+            SelectOptionDict(value=location.value, label=location.label)
+            for location in self._location_candidates
+        ]
+        errors = {}
+        if user_input is not None:
+            self._selected_location = next(
+                (
+                    location
+                    for location in self._location_candidates
+                    if location.value == user_input["location_id"]
+                ),
+                None,
+            )
+            if self._selected_location is not None:
+                candidates = station_candidates_for_location(
+                    self._selected_location, self._stations
+                )
+                if len(candidates) == 1:
+                    return self._create_location_entry(candidates[0])
+                return await self.async_step_station()
+            errors = {"base": "invalid_location"}
+        return self.async_show_form(
+            step_id="location",
+            data_schema=vol.Schema(
+                {
+                    vol.Required("location_id"): SelectSelector(
+                        SelectSelectorConfig(
+                            options=choices,
+                            mode=SelectSelectorMode.DROPDOWN,
+                            sort=True,
+                        )
+                    )
                 }
             ),
             errors=errors,
@@ -82,7 +124,10 @@ class SHMUConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         )
         if not candidates:
             candidates = self._stations
-        choices = {station.value: station.label for station in candidates}
+        choices = [
+            SelectOptionDict(value=station.value, label=station.label)
+            for station in candidates
+        ]
         errors = {}
         if user_input is not None:
             station = next(
@@ -99,7 +144,15 @@ class SHMUConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         return self.async_show_form(
             step_id="station",
             data_schema=vol.Schema(
-                {vol.Required("station_id"): vol.In(choices)}
+                {
+                    vol.Required("station_id"): SelectSelector(
+                        SelectSelectorConfig(
+                            options=choices,
+                            mode=SelectSelectorMode.DROPDOWN,
+                            sort=True,
+                        )
+                    )
+                }
             ),
             errors=errors,
         )

@@ -109,6 +109,23 @@ def station_candidates_for_location(
     ]
 
 
+def location_candidates_for_query(
+    query: str,
+    locations: Iterable[LocationOption],
+) -> list[LocationOption]:
+    """Return exact or substring locality matches for a user-facing query."""
+    query_key = _label_key(query)
+    if not query_key:
+        return []
+    locations = list(locations)
+    exact = [location for location in locations if _label_key(location.label) == query_key]
+    if exact:
+        return exact
+    return [
+        location
+        for location in locations
+        if query_key in _label_key(location.label)
+    ]
 def _label_key(label: str) -> str:
     return " ".join(label.casefold().split())
 

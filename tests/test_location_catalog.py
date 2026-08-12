@@ -88,6 +88,31 @@ class TestLocationCatalog(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(result, stations)
 
+    def test_location_query_prefers_exact_match(self):
+        module = _load_module()
+        locations = [
+            module.LocationOption("31396", "Pezinok"),
+            module.LocationOption("31581", "Pezinska Baba"),
+        ]
+
+        self.assertEqual(
+            module.location_candidates_for_query("  PEZINOK ", locations),
+            [locations[0]],
+        )
+
+    def test_location_query_returns_small_ambiguous_subset(self):
+        module = _load_module()
+        locations = [
+            module.LocationOption("31176", "Bratislava - Koliba"),
+            module.LocationOption("32737", "Bratislava (centrum)"),
+            module.LocationOption("31396", "Pezinok"),
+        ]
+
+        self.assertEqual(
+            module.location_candidates_for_query("Bratislava", locations),
+            locations[:2],
+        )
+
     async def test_fetch_catalog_uses_official_selectors_and_ssl_setting(self):
         module = _load_module()
         session = _Session(
