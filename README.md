@@ -16,19 +16,18 @@ This is a fork of `https://github.com/3DRIK/ha-shmu`. This fork adds forecast en
 
 2. **Configure the integration**:
    - Go to Configuration > Integrations > Add Integration > SHMU.
-   - Tap `Add hub` to enter cobfiguration flow (you can add multiple stations)
+   - Tap `Add hub` to enter the configuration flow (you can add multiple locations).
 
 ## Configuration Options
 
-| Option         | Description                                                                 |
-|----------------|-----------------------------------------------------------------------------|
-| Station ID     | ID of the SHMU meteorological station (e.g., `11813` for Bratislava).      |
-| Meteogram ID   | ID of the SHMU meteogram loaction (e.g., `32737` for Bratislava or `none` for no meteogram). |
-| Scan Interval  | How often (in seconds) the data should be updated (default: 300 seconds).  |
-| Verify SSL     | Verifying SHMU API SSL (recommended).                                      |
+Enter a locality name instead of SHMU numeric IDs. The integration validates it
+against SHMU's live location catalogue. If a search or locality maps to several
+forecast locations or observation stations, the flow shows a short dependent
+selector. `Verify SSL` remains available in both the initial and options flows.
 
-- You can find your nearest station at [SHMU Stations](https://www.shmu.sk/sk//?page=1&id=meteo_apocasie_sk) with ID in URL.
-- You can find Meteogram locations at [SHMU Meteograms](https://www.shmu.sk/sk/?page=769) with ID in URL.
+The normal refresh interval is 300 seconds. Existing entries that contain an
+older custom `scan_interval` continue to use it, but new entries no longer
+expose this implementation detail in the form.
 
 ## Sensors
 
@@ -63,12 +62,12 @@ integration downloads SHMU ALADIN forecast data during the normal coordinator
 update, normalizes station-nearest forecast rows, and writes
 `/config/shmu/forecast-cache-<entry_id>.json`.
 
-`forecast_cache_path` remains available as an advanced override for the cache
-file location. `forecast_source` can point at a local file or HTTP(S) URL
-containing helper-compatible JSON; when configured, that helper source overrides
-the native ALADIN downloader. Unchanged `source_run_id` values are skipped
-without rewriting the cache file, and forecast cache refresh failures are logged
-without breaking current station observation sensors.
+Legacy entries may retain `forecast_cache_path` as an advanced override and
+`forecast_source` as a local file or HTTP(S) helper JSON source. They remain
+runtime-compatible but are no longer exposed in the normal configuration or
+options UI. Unchanged `source_run_id` values are skipped without rewriting the
+cache file, and forecast cache refresh failures are logged without breaking
+current station observation sensors.
 
 For helper-based setups, update that cache from cron or a systemd timer with:
 
@@ -83,7 +82,7 @@ age, model run time, and valid forecast range.
 
 ## Troubleshooting
 
-- Ensure your station ID is correct.
+- Re-open the configuration flow and verify the selected locality/station.
 - Check the logs for errors if sensors are unavailable.
 - For some stations, data or some attributes are not available.
 - Sometimes there may be a delay in the publication of data or a longer period with no data published.
