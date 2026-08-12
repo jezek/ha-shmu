@@ -1,43 +1,43 @@
 {
-  "title": {
-    "sk": "Slovenský hydrometeorologický ústav (SHMU)",
-    "en": "Slovak Hydrometeorological Institute (SHMU)"
-  },
-  "configuration": {
-    "sk": {
-      "location_name": {
-        "name": "Lokalita",
-        "description": "Zadajte názov lokality. Ak vyhľadávanie nájde viac možností, vyberiete konkrétnu lokalitu v ďalšom kroku."
+  "config": {
+    "step": {
+      "user": {
+        "title": "Choose a forecast location",
+        "data": {
+          "location_name": "Location",
+          "verify_ssl": "Verify SSL certificates"
+        },
+        "data_description": {
+          "location_name": "Enter a location name. If the search finds multiple choices, you will select the exact location next.",
+          "verify_ssl": "Recommended when the SHMU certificate chain is trusted by this Home Assistant installation."
+        }
       },
-      "location_id": {
-        "name": "Konkrétna lokalita",
-        "description": "Vyberte jednu z lokalít nájdených podľa zadaného názvu."
+      "location": {
+        "title": "Choose the exact location",
+        "data": {
+          "location_id": "Location"
+        }
       },
-      "station_id": {
-        "name": "Pozorovacia stanica",
-        "description": "Vyberte stanicu pre aktuálne pozorovania v zvolenej lokalite."
-      },
-      "verify_ssl": {
-        "name": "Overovať SSL certifikáty",
-        "description": "Zapnite, ak chcete overovať SSL certifikáty (odporúčané)."
+      "station": {
+        "title": "Choose an observation station",
+        "data": {
+          "station_id": "Observation station"
+        }
       }
     },
-    "en": {
-      "location_name": {
-        "name": "Location",
-        "description": "Enter a location name. If the search finds multiple choices, you will select the exact location in the next step."
-      },
-      "location_id": {
-        "name": "Exact location",
-        "description": "Choose one of the locations found for the entered name."
-      },
-      "station_id": {
-        "name": "Observation station",
-        "description": "Choose the station used for current observations in the selected location."
-      },
-      "verify_ssl": {
-        "name": "Verify SSL Certificates",
-        "description": "Enable to verify SSL certificates (recommended)."
+    "error": {
+      "cannot_connect": "Unable to load the official SHMU location catalogue.",
+      "invalid_location": "No matching SHMU location was found.",
+      "invalid_station": "The selected station is no longer available."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "SHMU options",
+        "data": {
+          "verify_ssl": "Verify SSL certificates"
+        }
       }
     }
   }

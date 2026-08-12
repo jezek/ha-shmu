@@ -1,0 +1,44 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Vyberte lokalitu predpovede",
+        "data": {
+          "location_name": "Lokalita",
+          "verify_ssl": "Overovať SSL certifikáty"
+        },
+        "data_description": {
+          "location_name": "Zadajte názov lokality. Ak vyhľadávanie nájde viac možností, konkrétnu lokalitu vyberiete v ďalšom kroku.",
+          "verify_ssl": "Odporúčané, ak táto inštalácia Home Assistant dôveruje certifikačnému reťazcu SHMÚ."
+        }
+      },
+      "location": {
+        "title": "Vyberte konkrétnu lokalitu",
+        "data": {
+          "location_id": "Lokalita"
+        }
+      },
+      "station": {
+        "title": "Vyberte pozorovaciu stanicu",
+        "data": {
+          "station_id": "Pozorovacia stanica"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Nepodarilo sa načítať oficiálny katalóg lokalít SHMÚ.",
+      "invalid_location": "Nenašla sa zodpovedajúca lokalita SHMÚ.",
+      "invalid_station": "Vybraná stanica už nie je dostupná."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Možnosti SHMÚ",
+        "data": {
+          "verify_ssl": "Overovať SSL certifikáty"
+        }
+      }
+    }
+  }
+}
