@@ -184,7 +184,7 @@ class SHMUConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         return SHMUOptionsFlowHandler(config_entry)
 
 
-class SHMUOptionsFlowHandler(config_entries.OptionsFlow):
+class SHMUOptionsFlowHandler(config_entries.OptionsFlowWithReload):
     """Handle SHMU options."""
 
     def __init__(self, config_entry: config_entries.ConfigEntry):
