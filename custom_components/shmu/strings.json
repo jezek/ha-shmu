@@ -5,47 +5,31 @@
   },
   "configuration": {
     "sk": {
-      "station_id": {
-        "name": "ID stanice",
-        "description": "Zadajte ID meteorologickej stanice (napr. 11813 pre Bratislava)."
+      "location_id": {
+        "name": "Lokalita",
+        "description": "Vyberte lokalitu predpovede. Ak má viac pozorovacích staníc, vyberiete ju v ďalšom kroku."
       },
-      "scan_interval": {
-        "name": "Interval aktualizácie (sekundy)",
-        "description": "Interval v sekundách, ako často sa majú dáta aktualizovať."
+      "station_id": {
+        "name": "Pozorovacia stanica",
+        "description": "Vyberte stanicu pre aktuálne pozorovania v zvolenej lokalite."
       },
       "verify_ssl": {
         "name": "Overovať SSL certifikáty",
         "description": "Zapnite, ak chcete overovať SSL certifikáty (odporúčané)."
-      },
-      "forecast_cache_path": {
-        "name": "Cesta k forecast cache",
-        "description": "Voliteľná vlastná cesta k JSON cache súboru. Pri prázdnej hodnote sa použije cache spravovaná integráciou."
-      },
-      "forecast_source": {
-        "name": "Zdroj forecast cache",
-        "description": "Voliteľný pokročilý zdroj helper JSON dát. Pri prázdnej hodnote integrácia sťahuje SHMU ALADIN forecast automaticky."
       }
     },
     "en": {
-      "station_id": {
-        "name": "Station ID",
-        "description": "Enter the meteorological station ID (e.g., 11813 for Bratislava)."
+      "location_id": {
+        "name": "Location",
+        "description": "Choose a forecast location. If it has multiple observation stations, you will select one in the next step."
       },
-      "scan_interval": {
-        "name": "Scan Interval (seconds)",
-        "description": "Interval in seconds for how often data should be updated."
+      "station_id": {
+        "name": "Observation station",
+        "description": "Choose the station used for current observations in the selected location."
       },
       "verify_ssl": {
         "name": "Verify SSL Certificates",
         "description": "Enable to verify SSL certificates (recommended)."
-      },
-      "forecast_cache_path": {
-        "name": "Forecast cache path",
-        "description": "Optional custom path to the JSON cache file. Leave empty to use the integration-managed cache."
-      },
-      "forecast_source": {
-        "name": "Forecast cache source",
-        "description": "Optional advanced helper JSON source. Leave empty for automatic SHMU ALADIN forecast downloads."
       }
     }
   }

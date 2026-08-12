@@ -62,7 +62,9 @@ class SHMUDataUpdateCoordinator(DataUpdateCoordinator):
         self._entry = entry
         self._station_id = entry.data.get("station_id", "11813")
         self._meteogram_id = entry.data.get("meteogram_id", "none")
-        self._verify_ssl = entry.data.get("verify_ssl", True)
+        self._verify_ssl = entry.options.get(
+            "verify_ssl", entry.data.get("verify_ssl", True)
+        )
         self._api = SHMUAPI(self._station_id, self._verify_ssl)
         self.forecast_rows = []
         self.forecast_historical_temperatures = {}
