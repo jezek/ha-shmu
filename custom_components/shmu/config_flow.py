@@ -1,5 +1,6 @@
 """Configuration flow for SHMU."""
 
+from types import MappingProxyType
 from typing import Any, override
 
 from homeassistant import config_entries
@@ -15,6 +16,7 @@ import voluptuous as vol
 
 from .const import DOMAIN
 from .location_catalog import LocationOption, async_fetch_location_catalog
+from .subentry_migration import legacy_parent_data, legacy_subentry_data
 
 SUBENTRY_LIVE_STATION = "live_station"
 SUBENTRY_METEOGRAM = "meteogram"
@@ -27,6 +29,35 @@ class SHMUConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     VERSION = 2
     MINOR_VERSION = 0
+
+    @staticmethod
+    async def async_migrate_entry(hass, config_entry):
+        """Migrate one coupled legacy source into a location and subentries."""
+        if config_entry.version >= 2:
+            return True
+
+        subentries = {
+            child.subentry_id: child for child in config_entry.subentries.values()
+        }
+        for item in legacy_subentry_data(dict(config_entry.data)):
+            child = config_entries.ConfigSubentry(
+                data=MappingProxyType(item["data"]),
+                subentry_type=item["subentry_type"],
+                title=item["title"],
+                unique_id=item["unique_id"],
+            )
+            subentries[child.subentry_id] = child
+
+        parent_data = legacy_parent_data(dict(config_entry.data))
+        hass.config_entries.async_update_entry(
+            config_entry,
+            data=parent_data,
+            title=parent_data["location_name"],
+            subentries=subentries,
+            version=2,
+            minor_version=0,
+        )
+        return True
 
     @override
     async def async_step_user(self, user_input=None):
