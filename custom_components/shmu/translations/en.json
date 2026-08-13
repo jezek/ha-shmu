@@ -2,39 +2,75 @@
   "config": {
     "step": {
       "user": {
-        "title": "Choose a forecast location",
+        "title": "Add SHMU location",
         "data": {
-          "location_name": "Location",
+          "location_name": "Location name",
           "verify_ssl": "Verify SSL certificates"
         },
         "data_description": {
-          "location_name": "Enter a location name. If the search finds multiple choices, you will select the exact location next.",
-          "verify_ssl": "Recommended when the SHMU certificate chain is trusted by this Home Assistant installation."
-        }
-      },
-      "location": {
-        "title": "Choose the exact location",
-        "data": {
-          "location_id": "Location"
-        }
-      },
-      "station": {
-        "title": "Choose an observation station",
-        "data": {
-          "station_id": "Observation station"
+          "location_name": "A free-form name for this initially empty location container.",
+          "verify_ssl": "Inherited by every station and meteogram added below this location."
         }
       }
     },
     "error": {
-      "cannot_connect": "Unable to load the official SHMU location catalogue.",
-      "invalid_location": "No matching SHMU location was found.",
-      "invalid_station": "The selected station is no longer available."
+      "invalid_item": "Enter a non-empty location name."
+    }
+  },
+  "config_subentries": {
+    "live_station": {
+      "entry_type": "Live station",
+      "initiate_flow": {
+        "user": "Add live station"
+      },
+      "step": {
+        "live_station": {
+          "title": "Choose a live station",
+          "data": {
+            "station_id": "Observation station"
+          }
+        }
+      },
+      "abort": {
+        "cannot_connect": "Unable to load the official SHMU catalogue."
+      },
+      "error": {
+        "invalid_item": "The selected station is not in the current official catalogue.",
+        "already_configured": "This live station is already added to the location."
+      }
+    },
+    "meteogram": {
+      "entry_type": "Meteogram",
+      "initiate_flow": {
+        "user": "Add meteogram"
+      },
+      "step": {
+        "meteogram": {
+          "title": "Choose a forecast model",
+          "data": {
+            "model": "Forecast model"
+          }
+        },
+        "meteogram_area": {
+          "title": "Choose a meteogram area",
+          "data": {
+            "area_id": "Forecast area"
+          }
+        }
+      },
+      "abort": {
+        "cannot_connect": "Unable to load the official SHMU catalogue."
+      },
+      "error": {
+        "invalid_item": "The selected area is not in the current official catalogue.",
+        "already_configured": "This model and area are already added to the location."
+      }
     }
   },
   "options": {
     "step": {
       "init": {
-        "title": "SHMU options",
+        "title": "SHMU location options",
         "data": {
           "verify_ssl": "Verify SSL certificates"
         }
