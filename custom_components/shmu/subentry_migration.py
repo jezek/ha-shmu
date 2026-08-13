@@ -27,7 +27,11 @@ def legacy_subentry_data(data: dict[str, Any]) -> list[dict[str, Any]]:
             "subentry_type": SUBENTRY_LIVE_STATION,
             "title": f"Station {station_id}",
             "unique_id": f"{SUBENTRY_LIVE_STATION}:{station_id}",
-            "data": {"station_id": station_id, "station_name": station_id},
+            "data": {
+                "station_id": station_id,
+                "station_name": station_id,
+                "preserve_legacy_ids": True,
+            },
         }
     ]
 
@@ -43,6 +47,7 @@ def legacy_subentry_data(data: dict[str, Any]) -> list[dict[str, Any]]:
                         "model": model,
                         "area_id": meteogram_id,
                         "area_name": meteogram_id,
+                        "preserve_legacy_ids": True,
                     },
                 }
             )

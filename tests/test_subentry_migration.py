@@ -61,6 +61,7 @@ class TestSubentryMigration(unittest.TestCase):
         )
         self.assertEqual(children[0]["data"]["station_id"], "11815")
         self.assertEqual(children[1]["data"]["area_id"], "31396")
+        self.assertTrue(all(child["data"]["preserve_legacy_ids"] for child in children))
 
     def test_no_meteogram_sentinel_creates_only_station(self):
         module = _load_module()
