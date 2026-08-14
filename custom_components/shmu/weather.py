@@ -10,7 +10,6 @@ from homeassistant.components.weather import WeatherEntity, WeatherEntityFeature
 from homeassistant.helpers.sun import is_up
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .cache_paths import ecmwf_meteogram_cache_path_for_entry, forecast_cache_path_for_entry
 from .const import DOMAIN
 from .entity_helpers import (
     ecmwf_meteogram_device_info,
@@ -230,33 +229,21 @@ class SHMUECMWFMeteogramWeather(CoordinatorEntity, WeatherEntity):
 async def async_setup_entry(hass, config_entry, async_add_entities):
     """Set up the SHMU weather entities."""
     entry_data = hass.data[DOMAIN][config_entry.entry_id]
-    if "coordinators" in entry_data:
-        for subentry_id, coordinator in entry_data["coordinators"].items():
-            if coordinator.source.model == MODEL_ALADIN:
-                entities = [
-                    SHMUWeather(
-                        coordinator,
-                        coordinator._forecast_cache_path(MODEL_ALADIN),
-                    )
-                ]
-            elif coordinator.source.model == MODEL_ECMWF:
-                entities = [
-                    SHMUECMWFMeteogramWeather(
-                        coordinator,
-                        coordinator._forecast_cache_path(MODEL_ECMWF),
-                    )
-                ]
-            else:
-                continue
-            async_add_entities(entities, config_subentry_id=subentry_id)
-        return
-
-    coordinator = entry_data["coordinator"]
-    cache_path = forecast_cache_path_for_entry(hass, config_entry)
-    ecmwf_cache_path = ecmwf_meteogram_cache_path_for_entry(hass, config_entry)
-    async_add_entities(
-        [
-            SHMUWeather(coordinator, cache_path),
-            SHMUECMWFMeteogramWeather(coordinator, ecmwf_cache_path),
-        ]
-    )
+    for subentry_id, coordinator in entry_data["coordinators"].items():
+        if coordinator.source.model == MODEL_ALADIN:
+            entities = [
+                SHMUWeather(
+                    coordinator,
+                    coordinator._forecast_cache_path(MODEL_ALADIN),
+                )
+            ]
+        elif coordinator.source.model == MODEL_ECMWF:
+            entities = [
+                SHMUECMWFMeteogramWeather(
+                    coordinator,
+                    coordinator._forecast_cache_path(MODEL_ECMWF),
+                )
+            ]
+        else:
+            continue
+        async_add_entities(entities, config_subentry_id=subentry_id)

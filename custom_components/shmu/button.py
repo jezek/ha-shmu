@@ -67,21 +67,11 @@ class SHMUECMWFMeteogramRefreshButton(CoordinatorEntity, ButtonEntity):
 async def async_setup_entry(hass, config_entry, async_add_entities):
     """Set up SHMU refresh buttons."""
     entry_data = hass.data[DOMAIN][config_entry.entry_id]
-    if "coordinators" in entry_data:
-        for subentry_id, coordinator in entry_data["coordinators"].items():
-            if coordinator.source.model == MODEL_ALADIN:
-                entities = [SHMUForecastRefreshButton(coordinator)]
-            elif coordinator.source.model == MODEL_ECMWF:
-                entities = [SHMUECMWFMeteogramRefreshButton(coordinator)]
-            else:
-                continue
-            async_add_entities(entities, config_subentry_id=subentry_id)
-        return
-
-    coordinator = entry_data["coordinator"]
-    async_add_entities(
-        [
-            SHMUForecastRefreshButton(coordinator),
-            SHMUECMWFMeteogramRefreshButton(coordinator),
-        ]
-    )
+    for subentry_id, coordinator in entry_data["coordinators"].items():
+        if coordinator.source.model == MODEL_ALADIN:
+            entities = [SHMUForecastRefreshButton(coordinator)]
+        elif coordinator.source.model == MODEL_ECMWF:
+            entities = [SHMUECMWFMeteogramRefreshButton(coordinator)]
+        else:
+            continue
+        async_add_entities(entities, config_subentry_id=subentry_id)

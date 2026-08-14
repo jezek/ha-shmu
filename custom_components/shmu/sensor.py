@@ -619,10 +619,7 @@ def _build_sensors(hass, coordinator):
 async def async_setup_entry(hass, config_entry, async_add_entities):
     """Set up sensors under their independently configured sources."""
     entry_data = hass.data[DOMAIN][config_entry.entry_id]
-    if "coordinators" in entry_data:
-        for subentry_id, coordinator in entry_data["coordinators"].items():
-            sensors = _build_sensors(hass, coordinator)
-            if sensors:
-                async_add_entities(sensors, config_subentry_id=subentry_id)
-        return
-    async_add_entities(_build_sensors(hass, entry_data["coordinator"]))
+    for subentry_id, coordinator in entry_data["coordinators"].items():
+        sensors = _build_sensors(hass, coordinator)
+        if sensors:
+            async_add_entities(sensors, config_subentry_id=subentry_id)

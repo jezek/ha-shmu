@@ -16,14 +16,22 @@ This is a fork of `https://github.com/3DRIK/ha-shmu`. This fork adds forecast en
 
 2. **Configure the integration**:
    - Go to Configuration > Integrations > Add Integration > SHMU.
-   - Tap `Add hub` to enter the configuration flow (you can add multiple locations).
+   - Create a named SHMU location, then use its add action to attach live
+     stations and ALADIN/ECMWF meteograms independently.
 
 ## Configuration Options
 
-Enter a locality name instead of SHMU numeric IDs. The integration validates it
-against SHMU's live location catalogue. If a search or locality maps to several
-forecast locations or observation stations, the flow shows a short dependent
-selector. `Verify SSL` remains available in both the initial and options flows.
+The top-level entry is a user-named location container and may remain empty.
+Each **live station** child selects one official observation station. Each
+**meteogram** child independently selects ALADIN or ECMWF plus one official
+forecast area. The complete catalogues are searchable in Home Assistant and
+submitted IDs are validated again against current SHMU data.
+
+One location can contain several live stations and meteograms, including both
+models for the same area. Exact duplicate station or model/area children are
+rejected. `Verify SSL` is configured once on the location and inherited by all
+of its children. Existing entries are migrated automatically while retaining
+their entity and device identities where Home Assistant permits.
 
 The normal refresh interval is 300 seconds. Existing entries that contain an
 older custom `scan_interval` continue to use it, but new entries no longer
@@ -31,7 +39,7 @@ expose this implementation detail in the form.
 
 ## Sensors
 
-The integration creates device with the following sensors:
+Each live-station child creates an independent observation device with:
 
 - Temperature (°C)
 - Humidity (%)
@@ -42,7 +50,10 @@ The integration creates device with the following sensors:
 - Sun duration/min (s)
 - Precipitation volume/min (mm)
 - Precipitation duration/min (s)
-- Meteogram url (containing meteogram image url for 3 and 10 days in attributes)
+
+ALADIN and ECMWF meteogram children create separate forecast devices, weather
+entities, cache diagnostics and manual refresh buttons. ALADIN also exposes
+the meteogram URL and forecast summaries.
 
 [You can find a description of the attributes here](https://opendata.shmu.sk/meteorology/climate/now/metadata/aws1min-metadata.txt)
 
@@ -57,17 +68,18 @@ or for 10d meteogram:
 
 ## Forecast cache
 
-Forecast entities read an integration-managed JSON cache. By default, the
-integration downloads SHMU ALADIN forecast data during the normal coordinator
-update, normalizes station-nearest forecast rows, and writes
-`/config/shmu/forecast-cache-<entry_id>.json`.
+Each meteogram child owns an independent integration-managed JSON cache. The
+default path is
+`/config/shmu/<model>-cache-<entry_id>-<subentry_id>.json`, preventing one
+model or area from overwriting another. Service calls accept `entry_id` and
+`subentry_id`; `subentry_id` is required when a location has several children
+of the requested model.
 
-Legacy entries may retain `forecast_cache_path` as an advanced override and
-`forecast_source` as a local file or HTTP(S) helper JSON source. They remain
-runtime-compatible but are no longer exposed in the normal configuration or
-options UI. Unchanged `source_run_id` values are skipped without rewriting the
-cache file, and forecast cache refresh failures are logged without breaking
-current station observation sensors.
+During migration, existing entry-scoped caches are copied into the appropriate
+child cache without overwriting newer data; the old files are retained for
+rollback. Unchanged `source_run_id` values are skipped without rewriting the
+cache, and one forecast-source failure does not break unrelated station or
+meteogram children.
 
 For helper-based setups, update that cache from cron or a systemd timer with:
 
@@ -82,7 +94,8 @@ age, model run time, and valid forecast range.
 
 ## Troubleshooting
 
-- Re-open the configuration flow and verify the selected locality/station.
+- Open the location's subentries and verify the selected station, model and
+  forecast area.
 - Check the logs for errors if sensors are unavailable.
 - For some stations, data or some attributes are not available.
 - Sometimes there may be a delay in the publication of data or a longer period with no data published.
