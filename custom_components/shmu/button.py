@@ -8,7 +8,11 @@ from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
-from .entity_helpers import ecmwf_meteogram_device_info, forecast_device_info
+from .entity_helpers import (
+    ecmwf_meteogram_device_info,
+    entity_unique_id,
+    forecast_device_info,
+)
 
 
 class SHMUForecastRefreshButton(CoordinatorEntity, ButtonEntity):
@@ -21,8 +25,8 @@ class SHMUForecastRefreshButton(CoordinatorEntity, ButtonEntity):
     def __init__(self, coordinator):
         """Initialize the ALADIN forecast refresh button."""
         super().__init__(coordinator)
-        self._attr_unique_id = (
-            f"{DOMAIN}_{coordinator.config_entry.entry_id}_refresh_forecast_cache"
+        self._attr_unique_id = entity_unique_id(
+            coordinator, "refresh_forecast_cache"
         )
         self._attr_device_info = forecast_device_info(coordinator)
 
@@ -46,8 +50,8 @@ class SHMUECMWFMeteogramRefreshButton(CoordinatorEntity, ButtonEntity):
     def __init__(self, coordinator):
         """Initialize the ECMWF 10-day meteogram refresh button."""
         super().__init__(coordinator)
-        self._attr_unique_id = (
-            f"{DOMAIN}_{coordinator.config_entry.entry_id}_refresh_ecmwf_meteogram_cache"
+        self._attr_unique_id = entity_unique_id(
+            coordinator, "refresh_ecmwf_meteogram_cache"
         )
         self._attr_device_info = ecmwf_meteogram_device_info(coordinator)
 

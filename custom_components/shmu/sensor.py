@@ -7,6 +7,7 @@ from .cache_paths import forecast_cache_path_for_entry
 from .const import DOMAIN
 from .entity_helpers import (
     ecmwf_meteogram_device_info,
+    entity_unique_id,
     forecast_device_info,
     station_device_info,
 )
@@ -34,7 +35,7 @@ class SHMUSensor(CoordinatorEntity, SensorEntity):
         self._device_class = device_class
         self._icon = icon
         self._state_class = state_class
-        self._attr_unique_id = f"{DOMAIN}_{coordinator.config_entry.entry_id}_{sensor_key}"
+        self._attr_unique_id = entity_unique_id(coordinator, sensor_key)
 
         self._attr_device_info = station_device_info(coordinator)
 
@@ -81,7 +82,13 @@ class SHMUMeteogramSensor(CoordinatorEntity, SensorEntity):
         """Initialize the meteogram URL sensor."""
         super().__init__(coordinator)
         self._attr_name = "SHMU Meteogram URL"
-        self._attr_unique_id = f"{DOMAIN}_meteogram_url_{coordinator.config_entry.entry_id}"
+        self._attr_unique_id = entity_unique_id(
+            coordinator,
+            "meteogram_url",
+            legacy_unique_id=(
+                f"{DOMAIN}_meteogram_url_{coordinator.config_entry.entry_id}"
+            ),
+        )
         self._attr_icon = "mdi:image"
         self._meteogram_id = meteogram_id or "32737"  # Default meteogram ID
 
@@ -146,7 +153,7 @@ class SHMUForecastSummarySensor(CoordinatorEntity, SensorEntity):
         super().__init__(coordinator)
         self._summary_key = summary_key
         self._attr_name = name
-        self._attr_unique_id = f"{DOMAIN}_{coordinator.config_entry.entry_id}_{summary_key}"
+        self._attr_unique_id = entity_unique_id(coordinator, summary_key)
         self._attr_native_unit_of_measurement = unit
         self._attr_device_class = device_class
         self._attr_icon = icon
@@ -182,7 +189,7 @@ class SHMUForecastCacheInfoSensor(CoordinatorEntity, SensorEntity):
         super().__init__(coordinator)
         self._info_key = info_key
         self._attr_name = name
-        self._attr_unique_id = f"{DOMAIN}_{coordinator.config_entry.entry_id}_{info_key}"
+        self._attr_unique_id = entity_unique_id(coordinator, info_key)
         self._attr_native_unit_of_measurement = unit
         self._attr_device_class = device_class
         self._attr_state_class = state_class
@@ -222,8 +229,8 @@ class SHMUForecastHistoryInfoSensor(CoordinatorEntity, SensorEntity):
         super().__init__(coordinator)
         self._info_key = info_key
         self._attr_name = name
-        self._attr_unique_id = (
-            f"{DOMAIN}_{coordinator.config_entry.entry_id}_forecast_history_{info_key}"
+        self._attr_unique_id = entity_unique_id(
+            coordinator, f"forecast_history_{info_key}"
         )
         self._attr_icon = icon
         self._attr_device_info = forecast_device_info(coordinator)
@@ -252,9 +259,8 @@ class SHMUECMWFMeteogramCacheInfoSensor(CoordinatorEntity, SensorEntity):
         super().__init__(coordinator)
         self._info_key = info_key
         self._attr_name = name
-        self._attr_unique_id = (
-            f"{DOMAIN}_{coordinator.config_entry.entry_id}_"
-            f"ecmwf_meteogram_{info_key}"
+        self._attr_unique_id = entity_unique_id(
+            coordinator, f"ecmwf_meteogram_{info_key}"
         )
         self._attr_device_class = device_class
         self._attr_state_class = state_class

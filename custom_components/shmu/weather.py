@@ -12,7 +12,11 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .cache_paths import ecmwf_meteogram_cache_path_for_entry, forecast_cache_path_for_entry
 from .const import DOMAIN
-from .entity_helpers import ecmwf_meteogram_device_info, forecast_device_info
+from .entity_helpers import (
+    ecmwf_meteogram_device_info,
+    entity_unique_id,
+    forecast_device_info,
+)
 from .forecast import (
     ForecastCache,
     current_condition,
@@ -41,7 +45,7 @@ class SHMUWeather(CoordinatorEntity, WeatherEntity):
         """Initialize the forecast weather entity."""
         super().__init__(coordinator)
         self._cache = ForecastCache(cache_path) if cache_path else None
-        self._attr_unique_id = f"{DOMAIN}_{coordinator.config_entry.entry_id}_weather"
+        self._attr_unique_id = entity_unique_id(coordinator, "weather")
         self._attr_device_info = forecast_device_info(coordinator)
 
     @property
@@ -142,8 +146,8 @@ class SHMUECMWFMeteogramWeather(CoordinatorEntity, WeatherEntity):
         super().__init__(coordinator)
         self._cache_path = cache_path
         self._cache = ForecastCache(cache_path)
-        self._attr_unique_id = (
-            f"{DOMAIN}_{coordinator.config_entry.entry_id}_ecmwf_meteogram_weather"
+        self._attr_unique_id = entity_unique_id(
+            coordinator, "ecmwf_meteogram_weather"
         )
         self._attr_device_info = ecmwf_meteogram_device_info(coordinator)
 

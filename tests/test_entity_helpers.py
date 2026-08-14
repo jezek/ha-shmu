@@ -105,6 +105,40 @@ class TestEntityHelpers(unittest.TestCase):
         )
         self.assertEqual(info["via_device"], ("shmu", "entry-123"))
 
+    def test_entity_unique_ids_preserve_migrated_and_scope_new_children(self):
+        helpers = _load_entity_helpers()
+        migrated = types.SimpleNamespace(
+            config_entry=_ConfigEntry(),
+            source=types.SimpleNamespace(
+                subentry_id="migrated",
+                preserve_legacy_ids=True,
+            ),
+        )
+        new = types.SimpleNamespace(
+            config_entry=_ConfigEntry(),
+            source=types.SimpleNamespace(
+                subentry_id="new-child",
+                preserve_legacy_ids=False,
+            ),
+        )
+
+        self.assertEqual(
+            helpers.entity_unique_id(migrated, "weather"),
+            "shmu_entry-123_weather",
+        )
+        self.assertEqual(
+            helpers.entity_unique_id(
+                migrated,
+                "meteogram_url",
+                legacy_unique_id="shmu_meteogram_url_entry-123",
+            ),
+            "shmu_meteogram_url_entry-123",
+        )
+        self.assertEqual(
+            helpers.entity_unique_id(new, "weather"),
+            "shmu_entry-123_new-child_weather",
+        )
+
     def test_forecast_device_is_split_from_station_device(self):
         helpers = _load_entity_helpers()
 

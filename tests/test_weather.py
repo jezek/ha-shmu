@@ -55,6 +55,9 @@ def _load_weather():
         "const": {"DOMAIN": "shmu"},
         "entity_helpers": {
             "ecmwf_meteogram_device_info": Mock(return_value={}),
+            "entity_unique_id": lambda coordinator, suffix: (
+                f"shmu_{coordinator.config_entry.entry_id}_{suffix}"
+            ),
             "forecast_device_info": Mock(return_value={}),
         },
         "forecast": {

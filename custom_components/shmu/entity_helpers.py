@@ -5,7 +5,7 @@ from __future__ import annotations
 from homeassistant.helpers.entity import DeviceInfo
 
 from .const import DOMAIN
-from .runtime_sources import source_device_identifier
+from .runtime_sources import source_device_identifier, source_unique_id
 
 
 def _source(coordinator):
@@ -21,6 +21,19 @@ def _identifier(coordinator, legacy_suffix: str | None = None):
             identifier = f"{identifier}_{legacy_suffix}"
         return DOMAIN, identifier
     return source_device_identifier(DOMAIN, entry_id, source, legacy_suffix)
+
+
+def entity_unique_id(
+    coordinator, suffix: str, *, legacy_unique_id: str | None = None
+) -> str:
+    """Return the compatible unique ID for an entity below a source."""
+    source = _source(coordinator)
+    entry_id = coordinator.config_entry.entry_id
+    if source is None:
+        return legacy_unique_id or f"{DOMAIN}_{entry_id}_{suffix}"
+    if source.preserve_legacy_ids and legacy_unique_id:
+        return legacy_unique_id
+    return source_unique_id(DOMAIN, entry_id, source, suffix)
 
 
 def station_device_info(coordinator) -> DeviceInfo:
