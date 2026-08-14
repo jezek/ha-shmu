@@ -12,17 +12,18 @@ from homeassistant.core import HomeAssistant, ServiceCall, SupportsResponse
 from homeassistant.exceptions import HomeAssistantError
 import homeassistant.helpers.config_validation as cv
 
-from .cache_paths import forecast_cache_path_for_entry
 from .const import (
     CONF_ENTRY_ID,
     CONF_FORECAST_CACHE_PATH,
-    CONF_STATION_ID,
+    CONF_SUBENTRY_ID,
     DOMAIN,
     SERVICE_GET_FORECAST_COMPARISON,
     SERVICE_GET_FORECAST_SERIES,
     SERVICE_REFRESH_ECMWF_METEOGRAM_CACHE,
     SERVICE_REFRESH_FORECAST_CACHE,
 )
+from .service_routing import forecast_coordinator
+from .subentry_migration import MODEL_ALADIN, MODEL_ECMWF
 from .forecast import (
     FORECAST_SERIES_FIELDS,
     ForecastCache,
@@ -42,6 +43,7 @@ _SERVICES_REGISTERED = "_services_registered"
 
 _CACHE_SELECTOR_SCHEMA = {
     vol.Optional(CONF_ENTRY_ID): cv.string,
+    vol.Optional(CONF_SUBENTRY_ID): cv.string,
     vol.Optional(CONF_FORECAST_CACHE_PATH): cv.string,
 }
 
@@ -66,13 +68,14 @@ GET_FORECAST_COMPARISON_SCHEMA = vol.Schema(
 REFRESH_FORECAST_CACHE_SCHEMA = vol.Schema(
     {
         vol.Optional(CONF_ENTRY_ID): cv.string,
+        vol.Optional(CONF_SUBENTRY_ID): cv.string,
     }
 )
 
 REFRESH_ECMWF_METEOGRAM_CACHE_SCHEMA = vol.Schema(
     {
         vol.Optional(CONF_ENTRY_ID): cv.string,
-        vol.Optional(CONF_STATION_ID): cv.string,
+        vol.Optional(CONF_SUBENTRY_ID): cv.string,
     }
 )
 
@@ -111,28 +114,28 @@ async def async_setup_services(hass: HomeAssistant) -> None:
 
     async def refresh_forecast_cache(call: ServiceCall) -> dict[str, Any]:
         entry_data = _entry_data_for_call(hass, call)
-        coordinator = entry_data["coordinator"]
+        coordinator = _coordinator_for_call(entry_data, call, MODEL_ALADIN)
         result = await coordinator._async_refresh_forecast_cache(force_refresh=True)
         coordinator.async_update_listeners()
         if result is None:
             raise HomeAssistantError("SHMU forecast cache refresh failed")
         return {
             "entry_id": coordinator.config_entry.entry_id,
+            "subentry_id": coordinator.source.subentry_id,
             "changed": result["changed"],
             "info": result["info"],
         }
 
     async def refresh_ecmwf_meteogram_cache(call: ServiceCall) -> dict[str, Any]:
         entry_data = _entry_data_for_call(hass, call)
-        coordinator = entry_data["coordinator"]
-        result = await coordinator._async_refresh_ecmwf_meteogram_cache(
-            station_id=call.data.get(CONF_STATION_ID)
-        )
+        coordinator = _coordinator_for_call(entry_data, call, MODEL_ECMWF)
+        result = await coordinator._async_refresh_ecmwf_meteogram_cache()
         coordinator.async_update_listeners()
         if result is None:
             raise HomeAssistantError("SHMU ECMWF 10-day meteogram cache refresh failed")
         return {
             "entry_id": coordinator.config_entry.entry_id,
+            "subentry_id": coordinator.source.subentry_id,
             "station_id": result["station_id"],
             "changed": result["changed"],
             "info": result["info"],
@@ -206,14 +209,18 @@ def _cache_path_for_call(hass: HomeAssistant, call: ServiceCall) -> str:
         entry_data = domain_data.get(entry_id)
         if not entry_data:
             raise HomeAssistantError(f"Unknown SHMU entry_id: {entry_id}")
-        return _cache_path_for_entry_data(hass, entry_data)
+        return _cache_path_for_entry_data(
+            hass, entry_data, call.data.get(CONF_SUBENTRY_ID)
+        )
 
     entries = [data for key, data in domain_data.items() if key != _SERVICES_REGISTERED]
     if len(entries) != 1:
         raise HomeAssistantError(
             "Set entry_id or forecast_cache_path when multiple/no SHMU entries are loaded"
         )
-    return _cache_path_for_entry_data(hass, entries[0])
+    return _cache_path_for_entry_data(
+        hass, entries[0], call.data.get(CONF_SUBENTRY_ID)
+    )
 
 
 def _entry_data_for_call(hass: HomeAssistant, call: ServiceCall) -> dict[str, Any]:
@@ -231,9 +238,27 @@ def _entry_data_for_call(hass: HomeAssistant, call: ServiceCall) -> dict[str, An
     return entries[0]
 
 
-def _cache_path_for_entry_data(hass: HomeAssistant, entry_data: dict[str, Any]) -> str:
-    coordinator = entry_data["coordinator"]
-    return forecast_cache_path_for_entry(hass, coordinator.config_entry)
+def _cache_path_for_entry_data(
+    hass: HomeAssistant,
+    entry_data: dict[str, Any],
+    subentry_id: str | None = None,
+) -> str:
+    try:
+        coordinator = forecast_coordinator(
+            entry_data, MODEL_ALADIN, subentry_id
+        )
+    except ValueError as err:
+        raise HomeAssistantError(str(err)) from err
+    return coordinator._forecast_cache_path(MODEL_ALADIN)
+
+
+def _coordinator_for_call(entry_data, call: ServiceCall, model: str):
+    try:
+        return forecast_coordinator(
+            entry_data, model, call.data.get(CONF_SUBENTRY_ID)
+        )
+    except ValueError as err:
+        raise HomeAssistantError(str(err)) from err
 
 
 def _parse_service_datetime(value: str | None) -> datetime | None:

@@ -4,6 +4,10 @@ get_forecast_series:
       example: "01J..."
       selector:
         text: {}
+    subentry_id:
+      example: "01J..."
+      selector:
+        text: {}
     forecast_cache_path:
       example: "/config/shmu/forecast.json"
       selector:
@@ -33,6 +37,10 @@ get_forecast_series:
 get_forecast_comparison:
   fields:
     entry_id:
+      example: "01J..."
+      selector:
+        text: {}
+    subentry_id:
       example: "01J..."
       selector:
         text: {}
@@ -75,6 +83,10 @@ refresh_forecast_cache:
       example: "01J..."
       selector:
         text: {}
+    subentry_id:
+      example: "01J..."
+      selector:
+        text: {}
 
 refresh_ecmwf_meteogram_cache:
   fields:
@@ -82,7 +94,7 @@ refresh_ecmwf_meteogram_cache:
       example: "01J..."
       selector:
         text: {}
-    station_id:
-      example: "31396"
+    subentry_id:
+      example: "01J..."
       selector:
         text: {}
