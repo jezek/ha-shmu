@@ -12,6 +12,11 @@ from .entity_helpers import (
     station_device_info,
 )
 from .forecast import forecast_summary
+from .subentry_migration import (
+    MODEL_ALADIN,
+    MODEL_ECMWF,
+    SUBENTRY_LIVE_STATION,
+)
 from homeassistant.util.dt import now
 
 class SHMUSensor(CoordinatorEntity, SensorEntity):
@@ -284,10 +289,14 @@ class SHMUECMWFMeteogramCacheInfoSensor(CoordinatorEntity, SensorEntity):
         return value
 
 
-async def async_setup_entry(hass, config_entry, async_add_entities):
-    """Set up the SHMU sensors."""
-    coordinator = hass.data[DOMAIN][config_entry.entry_id]["coordinator"]
-    meteogram_id = coordinator.config_entry.data.get("meteogram_id", "none")
+def _build_sensors(hass, coordinator):
+    """Build the compatible sensor set for one coordinator."""
+    source = getattr(coordinator, "source", None)
+    meteogram_id = (
+        source.source_id
+        if source and source.model in {MODEL_ALADIN, MODEL_ECMWF}
+        else coordinator.config_entry.data.get("meteogram_id", "none")
+    )
     sensors = [
         SHMUSensor(
             coordinator=coordinator,
@@ -374,7 +383,11 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
     if meteogram_id != "none":
         sensors.append(SHMUMeteogramSensor(coordinator, meteogram_id))
 
-    forecast_cache_path = forecast_cache_path_for_entry(hass, coordinator.config_entry)
+    forecast_cache_path = (
+        coordinator._forecast_cache_path(MODEL_ALADIN)
+        if source
+        else forecast_cache_path_for_entry(hass, coordinator.config_entry)
+    )
     sensors.extend(
         [
             SHMUForecastSummarySensor(
@@ -576,4 +589,40 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
         ]
     )
 
-    async_add_entities(sensors)
+    if source is None:
+        return sensors
+    if source.source_type == SUBENTRY_LIVE_STATION:
+        return [sensor for sensor in sensors if type(sensor) is SHMUSensor]
+    if source.model == MODEL_ALADIN:
+        return [
+            sensor
+            for sensor in sensors
+            if isinstance(
+                sensor,
+                (
+                    SHMUMeteogramSensor,
+                    SHMUForecastSummarySensor,
+                    SHMUForecastCacheInfoSensor,
+                    SHMUForecastHistoryInfoSensor,
+                ),
+            )
+        ]
+    if source.model == MODEL_ECMWF:
+        return [
+            sensor
+            for sensor in sensors
+            if isinstance(sensor, SHMUECMWFMeteogramCacheInfoSensor)
+        ]
+    return []
+
+
+async def async_setup_entry(hass, config_entry, async_add_entities):
+    """Set up sensors under their independently configured sources."""
+    entry_data = hass.data[DOMAIN][config_entry.entry_id]
+    if "coordinators" in entry_data:
+        for subentry_id, coordinator in entry_data["coordinators"].items():
+            sensors = _build_sensors(hass, coordinator)
+            if sensors:
+                async_add_entities(sensors, config_subentry_id=subentry_id)
+        return
+    async_add_entities(_build_sensors(hass, entry_data["coordinator"]))
