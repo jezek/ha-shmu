@@ -1,9 +1,11 @@
+from homeassistant import config_entries
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.event import async_track_time_change
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 import logging
+from types import MappingProxyType
 from datetime import datetime, timedelta, timezone
 from .cache_paths import (
     ecmwf_meteogram_cache_path_for_entry,
@@ -22,10 +24,47 @@ from .forecast_jobs import (
 )
 from .registry_migration import async_migrate_legacy_ecmwf_registry
 from .runtime_sources import RuntimeSource, runtime_sources
-from .subentry_migration import MODEL_ALADIN, MODEL_ECMWF, SUBENTRY_LIVE_STATION
+from .subentry_migration import (
+    MODEL_ALADIN,
+    MODEL_ECMWF,
+    SUBENTRY_LIVE_STATION,
+    legacy_parent_data,
+    legacy_subentry_data,
+)
 from .services import async_setup_services, async_unload_services
 
 _LOGGER = logging.getLogger(__name__)
+
+
+async def async_migrate_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> bool:
+    """Migrate one coupled legacy source into a location and subentries."""
+    if config_entry.version >= 2:
+        return True
+
+    existing_unique_ids = {
+        child.unique_id for child in config_entry.subentries.values()
+    }
+    for item in legacy_subentry_data(dict(config_entry.data)):
+        if item["unique_id"] in existing_unique_ids:
+            continue
+        child = config_entries.ConfigSubentry(
+            data=MappingProxyType(item["data"]),
+            subentry_type=item["subentry_type"],
+            title=item["title"],
+            unique_id=item["unique_id"],
+        )
+        hass.config_entries.async_add_subentry(config_entry, child)
+        existing_unique_ids.add(item["unique_id"])
+
+    parent_data = legacy_parent_data(dict(config_entry.data))
+    hass.config_entries.async_update_entry(
+        config_entry,
+        data=parent_data,
+        title=parent_data["location_name"],
+        version=2,
+        minor_version=0,
+    )
+    return True
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up SHMU integration from a config entry."""
@@ -179,44 +218,49 @@ class SHMUDataUpdateCoordinator(DataUpdateCoordinator):
         if first_valid_time > now or first_valid_time.hour == 0:
             return
         day_start = first_valid_time.replace(hour=0, minute=0, second=0, microsecond=0)
-        session = async_get_clientsession(self._hass)
-        try:
-            self.forecast_historical_temperatures = await self._api.fetch_temperature_history(
-                session,
-                day_start,
-                first_valid_time,
-            )
-            self.forecast_history_info = {
-                "source": "observed_station_history",
-                "hour_count": len(self.forecast_historical_temperatures),
-            }
-        except Exception as err:
-            _LOGGER.warning("Unable to complete leading SHMU forecast day: %s", err)
-            source = self._entry.options.get(
-                CONF_FORECAST_SOURCE,
-                self._entry.data.get(CONF_FORECAST_SOURCE),
-            )
-            if source:
-                return
+        if self._api is not None:
+            session = async_get_clientsession(self._hass)
             try:
-                result = await self._hass.async_add_executor_job(
-                    leading_day_aladin_fallback_job(
-                        model_run_time=first_valid_time,
-                        latitude=self._hass.config.latitude,
-                        longitude=self._hass.config.longitude,
-                        verify_ssl=self._verify_ssl,
+                self.forecast_historical_temperatures = (
+                    await self._api.fetch_temperature_history(
+                        session,
+                        day_start,
+                        first_valid_time,
                     )
                 )
-                self.forecast_historical_temperatures = result["temperatures"]
-                self.forecast_history_info = result["info"]
-                _LOGGER.warning(
-                    "Completed leading SHMU forecast day from %s",
-                    self.forecast_history_info.get("source_run_id"),
+                self.forecast_history_info = {
+                    "source": "observed_station_history",
+                    "hour_count": len(self.forecast_historical_temperatures),
+                }
+                return
+            except Exception as err:
+                _LOGGER.warning("Unable to complete leading SHMU forecast day: %s", err)
+
+        source = self._entry.options.get(
+            CONF_FORECAST_SOURCE,
+            self._entry.data.get(CONF_FORECAST_SOURCE),
+        )
+        if source:
+            return
+        try:
+            result = await self._hass.async_add_executor_job(
+                leading_day_aladin_fallback_job(
+                    model_run_time=first_valid_time,
+                    latitude=self._hass.config.latitude,
+                    longitude=self._hass.config.longitude,
+                    verify_ssl=self._verify_ssl,
                 )
-            except Exception as fallback_err:
-                _LOGGER.warning(
-                    "Unable to use ALADIN leading-day fallback: %s", fallback_err
-                )
+            )
+            self.forecast_historical_temperatures = result["temperatures"]
+            self.forecast_history_info = result["info"]
+            _LOGGER.warning(
+                "Completed leading SHMU forecast day from %s",
+                self.forecast_history_info.get("source_run_id"),
+            )
+        except Exception as fallback_err:
+            _LOGGER.warning(
+                "Unable to use ALADIN leading-day fallback: %s", fallback_err
+            )
 
     async def _async_refresh_ecmwf_meteogram_cache(self, station_id: str | None = None):
         """Refresh the separate ECMWF 10-day meteogram cache on explicit request."""

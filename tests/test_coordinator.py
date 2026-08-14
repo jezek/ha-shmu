@@ -50,6 +50,19 @@ def _load_coordinator_module():
 
     config_entries = types.ModuleType("homeassistant.config_entries")
     config_entries.ConfigEntry = type("ConfigEntry", (), {})
+
+    class ConfigSubentry:
+        _next_id = 0
+
+        def __init__(self, *, data, subentry_type, title, unique_id):
+            type(self)._next_id += 1
+            self.subentry_id = f"child-{type(self)._next_id}"
+            self.data = data
+            self.subentry_type = subentry_type
+            self.title = title
+            self.unique_id = unique_id
+
+    config_entries.ConfigSubentry = ConfigSubentry
     core = types.ModuleType("homeassistant.core")
     core.HomeAssistant = type("HomeAssistant", (), {})
     core.callback = lambda function: function
@@ -62,6 +75,7 @@ def _load_coordinator_module():
     aiohttp_client.async_get_clientsession = Mock(return_value=object())
 
     homeassistant = types.ModuleType("homeassistant")
+    homeassistant.config_entries = config_entries
     helpers = types.ModuleType("homeassistant.helpers")
     sys.modules["homeassistant"] = homeassistant
     sys.modules["homeassistant.config_entries"] = config_entries
@@ -102,6 +116,8 @@ def _load_coordinator_module():
             "MODEL_ALADIN": "aladin",
             "MODEL_ECMWF": "ecmwf",
             "SUBENTRY_LIVE_STATION": "live_station",
+            "legacy_parent_data": Mock(),
+            "legacy_subentry_data": Mock(),
         },
     }
     for name, values in dependency_values.items():
@@ -129,6 +145,44 @@ def _load_coordinator_module():
 
 
 class TestCoordinatorForecastLifecycle(unittest.IsolatedAsyncioTestCase):
+    async def test_module_migration_creates_children_and_updates_parent(self):
+        coordinator_module = _load_coordinator_module()
+        coordinator_module.legacy_subentry_data.return_value = [
+            {
+                "data": {"station_id": "11815"},
+                "subentry_type": "live_station",
+                "title": "Pezinok",
+                "unique_id": "live_station:11815",
+            }
+        ]
+        coordinator_module.legacy_parent_data.return_value = {
+            "location_name": "Pezinok",
+            "verify_ssl": True,
+        }
+        existing = types.SimpleNamespace(
+            subentry_id="existing", unique_id="live_station:99999"
+        )
+        entry = types.SimpleNamespace(
+            version=1,
+            data={"station_id": "11815"},
+            subentries={"existing": existing},
+        )
+        hass = types.SimpleNamespace(
+            config_entries=types.SimpleNamespace(
+                async_add_subentry=Mock(), async_update_entry=Mock()
+            )
+        )
+
+        result = await coordinator_module.async_migrate_entry(hass, entry)
+
+        self.assertTrue(result)
+        update = hass.config_entries.async_update_entry.call_args.kwargs
+        self.assertEqual(update["version"], 2)
+        self.assertEqual(update["minor_version"], 0)
+        self.assertEqual(update["title"], "Pezinok")
+        self.assertNotIn("subentries", update)
+        hass.config_entries.async_add_subentry.assert_called_once()
+
     async def test_setup_entry_stores_source_mapping_and_forwards_platforms(self):
         coordinator_module = _load_coordinator_module()
         coordinators = {"station": object(), "forecast": object()}
