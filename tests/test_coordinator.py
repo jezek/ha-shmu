@@ -129,6 +129,54 @@ def _load_coordinator_module():
 
 
 class TestCoordinatorForecastLifecycle(unittest.IsolatedAsyncioTestCase):
+    async def test_setup_entry_stores_source_mapping_and_forwards_platforms(self):
+        coordinator_module = _load_coordinator_module()
+        coordinators = {"station": object(), "forecast": object()}
+        coordinator_module.async_create_source_coordinators = AsyncMock(
+            return_value=coordinators
+        )
+        config_entries = types.SimpleNamespace(
+            async_forward_entry_setups=AsyncMock()
+        )
+        hass = types.SimpleNamespace(
+            data={},
+            config_entries=config_entries,
+            async_add_executor_job=AsyncMock(),
+        )
+        entry = types.SimpleNamespace(entry_id="entry")
+
+        result = await coordinator_module.async_setup_entry(hass, entry)
+
+        self.assertTrue(result)
+        self.assertEqual(
+            hass.data["shmu"]["entry"], {"coordinators": coordinators}
+        )
+        coordinator_module.async_create_source_coordinators.assert_awaited_once_with(
+            hass, entry
+        )
+        config_entries.async_forward_entry_setups.assert_awaited_once_with(
+            entry, ["sensor", "weather", "button"]
+        )
+
+    async def test_unload_entry_removes_source_mapping(self):
+        coordinator_module = _load_coordinator_module()
+        config_entries = types.SimpleNamespace(
+            async_unload_platforms=AsyncMock(return_value=True)
+        )
+        hass = types.SimpleNamespace(
+            data={"shmu": {"entry": {"coordinators": {}}}},
+            config_entries=config_entries,
+        )
+        entry = types.SimpleNamespace(entry_id="entry")
+
+        result = await coordinator_module.async_unload_entry(hass, entry)
+
+        self.assertTrue(result)
+        self.assertNotIn("entry", hass.data["shmu"])
+        config_entries.async_unload_platforms.assert_awaited_once_with(
+            entry, ["sensor", "weather", "button"]
+        )
+
     async def test_source_coordinator_factory_refreshes_and_indexes_children(self):
         coordinator_module = _load_coordinator_module()
         live = types.SimpleNamespace(

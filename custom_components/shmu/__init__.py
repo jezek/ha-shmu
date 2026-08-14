@@ -37,10 +37,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         entry,
     )
 
-    coordinator = SHMUDataUpdateCoordinator(hass, entry)
-    await coordinator.async_config_entry_first_refresh()
-
-    hass.data[DOMAIN][entry.entry_id] = {"coordinator": coordinator}
+    coordinators = await async_create_source_coordinators(hass, entry)
+    hass.data[DOMAIN][entry.entry_id] = {"coordinators": coordinators}
     await async_setup_services(hass)
 
     # Forward setup to entity platforms.
