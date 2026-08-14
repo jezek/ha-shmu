@@ -78,6 +78,49 @@ class TestRuntimeSources(unittest.TestCase):
 
         self.assertTrue(source.preserve_legacy_ids)
 
+    def test_migrated_source_retains_entity_and_device_identifiers(self):
+        module = _load_module()
+        source = module.RuntimeSource(
+            subentry_id="child",
+            source_type="meteogram",
+            source_id="31396",
+            model="ecmwf",
+            preserve_legacy_ids=True,
+        )
+
+        self.assertEqual(
+            module.source_unique_id(
+                "shmu", "entry-123", source, "ecmwf_meteogram_weather"
+            ),
+            "shmu_entry-123_ecmwf_meteogram_weather",
+        )
+        self.assertEqual(
+            module.source_device_identifier(
+                "shmu", "entry-123", source, "ecmwf_meteogram"
+            ),
+            ("shmu", "entry-123_ecmwf_meteogram"),
+        )
+
+    def test_new_source_uses_subentry_scoped_identifiers(self):
+        module = _load_module()
+        source = module.RuntimeSource(
+            subentry_id="01K123",
+            source_type="meteogram",
+            source_id="31396",
+            model="aladin",
+        )
+
+        self.assertEqual(
+            module.source_unique_id("shmu", "entry-123", source, "weather"),
+            "shmu_entry-123_01K123_weather",
+        )
+        self.assertEqual(
+            module.source_device_identifier(
+                "shmu", "entry-123", source, "forecast"
+            ),
+            ("shmu", "entry-123_01K123"),
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

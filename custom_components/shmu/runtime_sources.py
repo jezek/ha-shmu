@@ -57,3 +57,30 @@ def runtime_sources(subentries: Iterable[Any]) -> list[RuntimeSource]:
             )
         )
     return result
+
+
+def source_unique_id(
+    domain: str,
+    entry_id: str,
+    source: RuntimeSource,
+    suffix: str,
+) -> str:
+    """Return a legacy-preserving or child-scoped entity unique ID."""
+    if source.preserve_legacy_ids:
+        return f"{domain}_{entry_id}_{suffix}"
+    return f"{domain}_{entry_id}_{source.subentry_id}_{suffix}"
+
+
+def source_device_identifier(
+    domain: str,
+    entry_id: str,
+    source: RuntimeSource,
+    legacy_suffix: str | None = None,
+) -> tuple[str, str]:
+    """Return a stable device identifier for migrated and newly added sources."""
+    if source.preserve_legacy_ids:
+        identifier = entry_id
+        if legacy_suffix:
+            identifier = f"{identifier}_{legacy_suffix}"
+        return domain, identifier
+    return domain, f"{entry_id}_{source.subentry_id}"
