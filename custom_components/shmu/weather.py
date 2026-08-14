@@ -23,6 +23,7 @@ from .forecast import (
     rows_as_daily_forecast,
     rows_as_hourly_forecast,
 )
+from .subentry_migration import MODEL_ALADIN, MODEL_ECMWF
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -228,7 +229,29 @@ class SHMUECMWFMeteogramWeather(CoordinatorEntity, WeatherEntity):
 
 async def async_setup_entry(hass, config_entry, async_add_entities):
     """Set up the SHMU weather entities."""
-    coordinator = hass.data[DOMAIN][config_entry.entry_id]["coordinator"]
+    entry_data = hass.data[DOMAIN][config_entry.entry_id]
+    if "coordinators" in entry_data:
+        for subentry_id, coordinator in entry_data["coordinators"].items():
+            if coordinator.source.model == MODEL_ALADIN:
+                entities = [
+                    SHMUWeather(
+                        coordinator,
+                        coordinator._forecast_cache_path(MODEL_ALADIN),
+                    )
+                ]
+            elif coordinator.source.model == MODEL_ECMWF:
+                entities = [
+                    SHMUECMWFMeteogramWeather(
+                        coordinator,
+                        coordinator._forecast_cache_path(MODEL_ECMWF),
+                    )
+                ]
+            else:
+                continue
+            async_add_entities(entities, config_subentry_id=subentry_id)
+        return
+
+    coordinator = entry_data["coordinator"]
     cache_path = forecast_cache_path_for_entry(hass, config_entry)
     ecmwf_cache_path = ecmwf_meteogram_cache_path_for_entry(hass, config_entry)
     async_add_entities(

@@ -66,6 +66,10 @@ def _load_weather():
             "rows_as_daily_forecast": Mock(),
             "rows_as_hourly_forecast": Mock(),
         },
+        "subentry_migration": {
+            "MODEL_ALADIN": "aladin",
+            "MODEL_ECMWF": "ecmwf",
+        },
     }
     for name, values in dependencies.items():
         module = types.ModuleType(f"custom_components.shmu.{name}")
@@ -123,6 +127,45 @@ class TestECMWFWeather(unittest.TestCase):
         self.assertEqual(entity.wind_bearing, 245.0)
         self.assertEqual(entity.native_visibility, 20000.0)
         self.assertEqual(entity._attr_native_visibility_unit, "m")
+
+
+class TestWeatherPlatformRouting(unittest.IsolatedAsyncioTestCase):
+    async def test_routes_model_weather_entities_to_subentries(self):
+        weather, _ = _load_weather()
+
+        def coordinator(model):
+            return types.SimpleNamespace(
+                config_entry=_ConfigEntry(),
+                source=types.SimpleNamespace(model=model),
+                _forecast_cache_path=Mock(return_value=f"/{model}.json"),
+            )
+
+        hass = types.SimpleNamespace(
+            data={
+                "shmu": {
+                    "entry-123": {
+                        "coordinators": {
+                            "a": coordinator("aladin"),
+                            "e": coordinator("ecmwf"),
+                        }
+                    }
+                }
+            }
+        )
+        batches = []
+
+        await weather.async_setup_entry(
+            hass,
+            _ConfigEntry(),
+            lambda entities, **kwargs: batches.append((entities, kwargs)),
+        )
+
+        self.assertEqual(
+            [kwargs["config_subentry_id"] for _, kwargs in batches],
+            ["a", "e"],
+        )
+        self.assertIsInstance(batches[0][0][0], weather.SHMUWeather)
+        self.assertIsInstance(batches[1][0][0], weather.SHMUECMWFMeteogramWeather)
 
 
 if __name__ == "__main__":

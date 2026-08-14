@@ -100,6 +100,50 @@ class _Coordinator:
 
 
 class TestRefreshButtons(unittest.IsolatedAsyncioTestCase):
+    async def test_platform_routes_buttons_to_forecast_subentries(self):
+        button = _load_button()
+        aladin = _Coordinator()
+        aladin.source = types.SimpleNamespace(
+            model="aladin", subentry_id="aladin-child", source_id="31396", preserve_legacy_ids=False
+        )
+        ecmwf = _Coordinator()
+        ecmwf.source = types.SimpleNamespace(
+            model="ecmwf", subentry_id="ecmwf-child", source_id="31396", preserve_legacy_ids=False
+        )
+        live = _Coordinator()
+        live.source = types.SimpleNamespace(
+            model=None, subentry_id="live-child", source_id="11815", preserve_legacy_ids=False
+        )
+        hass = types.SimpleNamespace(
+            data={
+                "shmu": {
+                    "entry-123": {
+                        "coordinators": {
+                            "aladin-child": aladin,
+                            "ecmwf-child": ecmwf,
+                            "live-child": live,
+                        }
+                    }
+                }
+            }
+        )
+        batches = []
+
+        await button.async_setup_entry(
+            hass,
+            _ConfigEntry(),
+            lambda entities, **kwargs: batches.append((entities, kwargs)),
+        )
+
+        self.assertEqual(
+            [batch[1]["config_subentry_id"] for batch in batches],
+            ["aladin-child", "ecmwf-child"],
+        )
+        self.assertIsInstance(batches[0][0][0], button.SHMUForecastRefreshButton)
+        self.assertIsInstance(
+            batches[1][0][0], button.SHMUECMWFMeteogramRefreshButton
+        )
+
     async def test_forecast_refresh_button_calls_coordinator(self):
         button = _load_button()
         coordinator = _Coordinator()
