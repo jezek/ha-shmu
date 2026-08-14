@@ -253,7 +253,7 @@ class SHMUDataUpdateCoordinator(DataUpdateCoordinator):
             )
             self.forecast_historical_temperatures = result["temperatures"]
             self.forecast_history_info = result["info"]
-            _LOGGER.warning(
+            _LOGGER.debug(
                 "Completed leading SHMU forecast day from %s",
                 self.forecast_history_info.get("source_run_id"),
             )
