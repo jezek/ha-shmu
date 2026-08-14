@@ -50,6 +50,61 @@ class _Coordinator:
 
 
 class TestEntityHelpers(unittest.TestCase):
+    def test_new_children_have_independent_subentry_devices(self):
+        helpers = _load_entity_helpers()
+        source_type = types.SimpleNamespace
+
+        live_coordinator = types.SimpleNamespace(
+            config_entry=_ConfigEntry(),
+            source=source_type(
+                subentry_id="live-child",
+                source_id="11815",
+                preserve_legacy_ids=False,
+            ),
+        )
+        forecast_coordinator = types.SimpleNamespace(
+            config_entry=_ConfigEntry(),
+            source=source_type(
+                subentry_id="forecast-child",
+                source_id="31396",
+                preserve_legacy_ids=False,
+            ),
+        )
+
+        station_info = helpers.station_device_info(live_coordinator)
+        forecast_info = helpers.forecast_device_info(forecast_coordinator)
+
+        self.assertEqual(
+            station_info["identifiers"],
+            {("shmu", "entry-123_live-child")},
+        )
+        self.assertEqual(station_info["name"], "SHMU Station 11815")
+        self.assertEqual(
+            forecast_info["identifiers"],
+            {("shmu", "entry-123_forecast-child")},
+        )
+        self.assertEqual(forecast_info["name"], "SHMU Forecast 31396")
+        self.assertNotIn("via_device", forecast_info)
+
+    def test_migrated_child_retains_legacy_forecast_device(self):
+        helpers = _load_entity_helpers()
+        coordinator = types.SimpleNamespace(
+            config_entry=_ConfigEntry(),
+            source=types.SimpleNamespace(
+                subentry_id="migrated",
+                source_id="32737",
+                preserve_legacy_ids=True,
+            ),
+        )
+
+        info = helpers.ecmwf_meteogram_device_info(coordinator)
+
+        self.assertEqual(
+            info["identifiers"],
+            {("shmu", "entry-123_ecmwf_meteogram")},
+        )
+        self.assertEqual(info["via_device"], ("shmu", "entry-123"))
+
     def test_forecast_device_is_split_from_station_device(self):
         helpers = _load_entity_helpers()
 

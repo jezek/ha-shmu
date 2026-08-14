@@ -5,13 +5,32 @@ from __future__ import annotations
 from homeassistant.helpers.entity import DeviceInfo
 
 from .const import DOMAIN
+from .runtime_sources import source_device_identifier
+
+
+def _source(coordinator):
+    return getattr(coordinator, "source", None)
+
+
+def _identifier(coordinator, legacy_suffix: str | None = None):
+    source = _source(coordinator)
+    entry_id = coordinator.config_entry.entry_id
+    if source is None:
+        identifier = entry_id
+        if legacy_suffix:
+            identifier = f"{identifier}_{legacy_suffix}"
+        return DOMAIN, identifier
+    return source_device_identifier(DOMAIN, entry_id, source, legacy_suffix)
 
 
 def station_device_info(coordinator) -> DeviceInfo:
     """Return device metadata for current SHMU station observations."""
-    station_id = coordinator.config_entry.data["station_id"]
+    source = _source(coordinator)
+    station_id = (
+        source.source_id if source else coordinator.config_entry.data["station_id"]
+    )
     return DeviceInfo(
-        identifiers={(DOMAIN, coordinator.config_entry.entry_id)},
+        identifiers={_identifier(coordinator)},
         name=f"SHMU Station {station_id}",
         manufacturer="Slovenský hydrometeorologický ústav",
         model="Weather Station",
@@ -21,29 +40,38 @@ def station_device_info(coordinator) -> DeviceInfo:
 
 def forecast_device_info(coordinator) -> DeviceInfo:
     """Return device metadata for cache-backed SHMU forecast entities."""
-    station_id = coordinator.config_entry.data["station_id"]
-    station_identifier = (DOMAIN, coordinator.config_entry.entry_id)
-    return DeviceInfo(
-        identifiers={(DOMAIN, f"{coordinator.config_entry.entry_id}_forecast")},
-        name=f"SHMU Forecast {station_id}",
+    source = _source(coordinator)
+    area_id = source.source_id if source else coordinator.config_entry.data["station_id"]
+    values = dict(
+        identifiers={_identifier(coordinator, "forecast")},
+        name=f"SHMU Forecast {area_id}",
         manufacturer="Slovenský hydrometeorologický ústav",
         model="ALADIN SK 4.5 km Forecast Cache",
         configuration_url=(
             "https://opendata.shmu.sk/meteorology/weather/nwp/aladin/sk/4.5km"
         ),
         sw_version="1.0",
-        via_device=station_identifier,
     )
+    if source is None or source.preserve_legacy_ids:
+        values["via_device"] = (DOMAIN, coordinator.config_entry.entry_id)
+    return DeviceInfo(**values)
 
 
 def ecmwf_meteogram_device_info(coordinator) -> DeviceInfo:
     """Return device metadata for ECMWF 10-day meteogram forecast entities."""
-    station_id = coordinator.config_entry.data["station_id"]
-    meteogram_id = coordinator.config_entry.data.get("meteogram_id", station_id)
-    station_identifier = (DOMAIN, coordinator.config_entry.entry_id)
-    return DeviceInfo(
-        identifiers={(DOMAIN, f"{coordinator.config_entry.entry_id}_ecmwf_meteogram")},
-        name=f"SHMU ECMWF 10-day meteogram {station_id}",
+    source = _source(coordinator)
+    station_id = coordinator.config_entry.data.get("station_id", "")
+    meteogram_id = (
+        source.source_id
+        if source
+        else coordinator.config_entry.data.get("meteogram_id", station_id)
+    )
+    values = dict(
+        identifiers={_identifier(coordinator, "ecmwf_meteogram")},
+        name=(
+            f"SHMU ECMWF 10-day meteogram "
+            f"{meteogram_id if source else station_id}"
+        ),
         manufacturer="Slovenský hydrometeorologický ústav",
         model="ECMWF 10-day Meteogram Forecast Cache",
         configuration_url=(
@@ -51,5 +79,7 @@ def ecmwf_meteogram_device_info(coordinator) -> DeviceInfo:
             f"?id=meteo_num_mgram10&nwp_mesto={meteogram_id}&page=1"
         ),
         sw_version="1.0",
-        via_device=station_identifier,
     )
+    if source is None or source.preserve_legacy_ids:
+        values["via_device"] = (DOMAIN, coordinator.config_entry.entry_id)
+    return DeviceInfo(**values)
