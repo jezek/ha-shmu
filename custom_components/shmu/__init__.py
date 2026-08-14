@@ -10,6 +10,7 @@ from .cache_paths import (
     forecast_cache_path_for_subentry,
     forecast_cache_path_for_entry,
     migrate_legacy_ecmwf_meteogram_cache,
+    seed_subentry_cache_from_legacy,
 )
 from .const import CONF_FORECAST_SOURCE, DOMAIN
 from .api import SHMUAPI
@@ -20,7 +21,7 @@ from .forecast_jobs import (
     leading_day_aladin_fallback_job,
 )
 from .registry_migration import async_migrate_legacy_ecmwf_registry
-from .runtime_sources import RuntimeSource
+from .runtime_sources import RuntimeSource, runtime_sources
 from .subentry_migration import MODEL_ALADIN, MODEL_ECMWF, SUBENTRY_LIVE_STATION
 from .services import async_setup_services, async_unload_services
 
@@ -275,3 +276,26 @@ class SHMUDataUpdateCoordinator(DataUpdateCoordinator):
         if source is None or source.model == MODEL_ECMWF:
             await self._async_refresh_ecmwf_meteogram_cache()
         self.async_update_listeners()
+
+
+async def async_create_source_coordinators(
+    hass: HomeAssistant,
+    entry: ConfigEntry,
+    coordinator_factory=None,
+) -> dict[str, SHMUDataUpdateCoordinator]:
+    """Create and first-refresh one coordinator for every valid subentry."""
+    factory = coordinator_factory or SHMUDataUpdateCoordinator
+    coordinators: dict[str, SHMUDataUpdateCoordinator] = {}
+    for source in runtime_sources(entry.subentries.values()):
+        if source.preserve_legacy_ids and source.model is not None:
+            await hass.async_add_executor_job(
+                seed_subentry_cache_from_legacy,
+                hass,
+                entry,
+                source.subentry_id,
+                source.model,
+            )
+        coordinator = factory(hass, entry, source)
+        await coordinator.async_config_entry_first_refresh()
+        coordinators[source.subentry_id] = coordinator
+    return coordinators

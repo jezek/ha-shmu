@@ -77,6 +77,7 @@ def _load_coordinator_module():
             "forecast_cache_path_for_entry": Mock(),
             "forecast_cache_path_for_subentry": Mock(),
             "migrate_legacy_ecmwf_meteogram_cache": Mock(),
+            "seed_subentry_cache_from_legacy": Mock(),
         },
         "const": {"CONF_FORECAST_SOURCE": "forecast_source", "DOMAIN": "shmu"},
         "api": {"SHMUAPI": type("SHMUAPI", (), {})},
@@ -91,6 +92,7 @@ def _load_coordinator_module():
         },
         "runtime_sources": {
             "RuntimeSource": type("RuntimeSource", (), {}),
+            "runtime_sources": Mock(return_value=[]),
         },
         "services": {
             "async_setup_services": AsyncMock(),
@@ -127,6 +129,55 @@ def _load_coordinator_module():
 
 
 class TestCoordinatorForecastLifecycle(unittest.IsolatedAsyncioTestCase):
+    async def test_source_coordinator_factory_refreshes_and_indexes_children(self):
+        coordinator_module = _load_coordinator_module()
+        live = types.SimpleNamespace(
+            subentry_id="live", model=None, preserve_legacy_ids=True
+        )
+        ecmwf = types.SimpleNamespace(
+            subentry_id="forecast", model="ecmwf", preserve_legacy_ids=True
+        )
+        coordinator_module.runtime_sources.return_value = [live, ecmwf]
+        hass = types.SimpleNamespace(async_add_executor_job=AsyncMock())
+        entry = types.SimpleNamespace(subentries={"live": live, "forecast": ecmwf})
+        created = []
+
+        def factory(_hass, _entry, source):
+            coordinator = types.SimpleNamespace(
+                source=source,
+                async_config_entry_first_refresh=AsyncMock(),
+            )
+            created.append(coordinator)
+            return coordinator
+
+        result = await coordinator_module.async_create_source_coordinators(
+            hass, entry, factory
+        )
+
+        self.assertEqual(result, {"live": created[0], "forecast": created[1]})
+        created[0].async_config_entry_first_refresh.assert_awaited_once_with()
+        created[1].async_config_entry_first_refresh.assert_awaited_once_with()
+        hass.async_add_executor_job.assert_awaited_once_with(
+            coordinator_module.seed_subentry_cache_from_legacy,
+            hass,
+            entry,
+            "forecast",
+            "ecmwf",
+        )
+
+    async def test_empty_parent_creates_no_source_coordinators(self):
+        coordinator_module = _load_coordinator_module()
+        coordinator_module.runtime_sources.return_value = []
+        hass = types.SimpleNamespace(async_add_executor_job=AsyncMock())
+        entry = types.SimpleNamespace(subentries={})
+
+        result = await coordinator_module.async_create_source_coordinators(
+            hass, entry, Mock()
+        )
+
+        self.assertEqual(result, {})
+        hass.async_add_executor_job.assert_not_awaited()
+
     async def test_aladin_child_refreshes_only_its_forecast(self):
         coordinator_module = _load_coordinator_module()
         coordinator = object.__new__(coordinator_module.SHMUDataUpdateCoordinator)
