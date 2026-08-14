@@ -7,6 +7,7 @@ import logging
 from datetime import datetime, timedelta, timezone
 from .cache_paths import (
     ecmwf_meteogram_cache_path_for_entry,
+    forecast_cache_path_for_subentry,
     forecast_cache_path_for_entry,
     migrate_legacy_ecmwf_meteogram_cache,
 )
@@ -19,6 +20,8 @@ from .forecast_jobs import (
     leading_day_aladin_fallback_job,
 )
 from .registry_migration import async_migrate_legacy_ecmwf_registry
+from .runtime_sources import RuntimeSource
+from .subentry_migration import MODEL_ALADIN, MODEL_ECMWF, SUBENTRY_LIVE_STATION
 from .services import async_setup_services, async_unload_services
 
 _LOGGER = logging.getLogger(__name__)
@@ -56,16 +59,34 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 class SHMUDataUpdateCoordinator(DataUpdateCoordinator):
     """Class to manage fetching SHMU data."""
 
-    def __init__(self, hass: HomeAssistant, entry: ConfigEntry):
+    def __init__(
+        self,
+        hass: HomeAssistant,
+        entry: ConfigEntry,
+        source: RuntimeSource | None = None,
+    ):
         """Initialize the coordinator."""
         self._hass = hass
         self._entry = entry
-        self._station_id = entry.data.get("station_id", "11813")
-        self._meteogram_id = entry.data.get("meteogram_id", "none")
+        self.source = source
+        self._station_id = (
+            source.source_id
+            if source and source.source_type == SUBENTRY_LIVE_STATION
+            else entry.data.get("station_id", "11813")
+        )
+        self._meteogram_id = (
+            source.source_id
+            if source and source.model in {MODEL_ALADIN, MODEL_ECMWF}
+            else entry.data.get("meteogram_id", "none")
+        )
         self._verify_ssl = entry.options.get(
             "verify_ssl", entry.data.get("verify_ssl", True)
         )
-        self._api = SHMUAPI(self._station_id, self._verify_ssl)
+        self._api = (
+            SHMUAPI(self._station_id, self._verify_ssl)
+            if source is None or source.source_type == SUBENTRY_LIVE_STATION
+            else None
+        )
         self.forecast_rows = []
         self.forecast_historical_temperatures = {}
         self.forecast_history_info = {}
@@ -84,28 +105,33 @@ class SHMUDataUpdateCoordinator(DataUpdateCoordinator):
         super().__init__(
             hass,
             _LOGGER,
-            name=DOMAIN,
+            name=(f"{DOMAIN}_{source.subentry_id}" if source else DOMAIN),
             update_interval=timedelta(seconds=entry.data.get("scan_interval", 300)),
         )
 
     async def _async_update_data(self):
         """Fetch data from SHMU API."""
         try:
-            session = async_get_clientsession(self._hass)
-            try:
-                data = await self._api.fetch_data(session)
-            except Exception as err:
-                previous_data = getattr(self, "data", None)
-                if not previous_data:
-                    raise
-                _LOGGER.warning(
-                    "Unable to refresh SHMU current observations; preserving "
-                    "the last valid station data: %s",
-                    err,
-                )
-                data = previous_data
-            await self._async_refresh_forecast_cache()
-            await self._async_refresh_ecmwf_meteogram_cache()
+            data = {}
+            if self._api is not None:
+                session = async_get_clientsession(self._hass)
+                try:
+                    data = await self._api.fetch_data(session)
+                except Exception as err:
+                    previous_data = getattr(self, "data", None)
+                    if not previous_data:
+                        raise
+                    _LOGGER.warning(
+                        "Unable to refresh SHMU current observations; preserving "
+                        "the last valid station data: %s",
+                        err,
+                    )
+                    data = previous_data
+            source = getattr(self, "source", None)
+            if source is None or source.model == MODEL_ALADIN:
+                await self._async_refresh_forecast_cache()
+            if source is None or source.model == MODEL_ECMWF:
+                await self._async_refresh_ecmwf_meteogram_cache()
             return data
         except Exception as err:
             raise UpdateFailed(f"Error communicating with SHMU API: {err}")
@@ -117,7 +143,7 @@ class SHMUDataUpdateCoordinator(DataUpdateCoordinator):
             self._entry.data.get(CONF_FORECAST_SOURCE),
         )
 
-        cache_path = forecast_cache_path_for_entry(self._hass, self._entry)
+        cache_path = self._forecast_cache_path(MODEL_ALADIN)
         update_job = forecast_cache_update_job(
             cache_path,
             source=source,
@@ -196,7 +222,7 @@ class SHMUDataUpdateCoordinator(DataUpdateCoordinator):
     async def _async_refresh_ecmwf_meteogram_cache(self, station_id: str | None = None):
         """Refresh the separate ECMWF 10-day meteogram cache on explicit request."""
         selected_station_id = station_id or self._default_meteogram_station_id()
-        cache_path = ecmwf_meteogram_cache_path_for_entry(self._hass, self._entry)
+        cache_path = self._forecast_cache_path(MODEL_ECMWF)
         update_job = ecmwf_meteogram_cache_update_job(
             cache_path,
             station_id=selected_station_id,
@@ -222,6 +248,20 @@ class SHMUDataUpdateCoordinator(DataUpdateCoordinator):
             return self._meteogram_id
         return self._station_id
 
+    def _forecast_cache_path(self, model: str) -> str:
+        """Return legacy or child-specific path for this coordinator."""
+        source = getattr(self, "source", None)
+        if source is not None:
+            return forecast_cache_path_for_subentry(
+                self._hass,
+                self._entry,
+                source.subentry_id,
+                model,
+            )
+        if model == MODEL_ECMWF:
+            return ecmwf_meteogram_cache_path_for_entry(self._hass, self._entry)
+        return forecast_cache_path_for_entry(self._hass, self._entry)
+
     @callback
     def _handle_midnight_forecast_refresh(self, now) -> None:
         """Refresh forecast rows just after local midnight."""
@@ -229,6 +269,9 @@ class SHMUDataUpdateCoordinator(DataUpdateCoordinator):
 
     async def _async_midnight_forecast_refresh(self) -> None:
         """Refresh only forecast cache and notify forecast entities."""
-        await self._async_refresh_forecast_cache()
-        await self._async_refresh_ecmwf_meteogram_cache()
+        source = getattr(self, "source", None)
+        if source is None or source.model == MODEL_ALADIN:
+            await self._async_refresh_forecast_cache()
+        if source is None or source.model == MODEL_ECMWF:
+            await self._async_refresh_ecmwf_meteogram_cache()
         self.async_update_listeners()

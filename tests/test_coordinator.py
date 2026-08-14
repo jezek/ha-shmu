@@ -31,7 +31,9 @@ def _load_coordinator_module():
         "custom_components.shmu.forecast",
         "custom_components.shmu.forecast_jobs",
         "custom_components.shmu.registry_migration",
+        "custom_components.shmu.runtime_sources",
         "custom_components.shmu.services",
+        "custom_components.shmu.subentry_migration",
     }
     missing = object()
     previous_modules = {
@@ -73,6 +75,7 @@ def _load_coordinator_module():
         "cache_paths": {
             "ecmwf_meteogram_cache_path_for_entry": Mock(),
             "forecast_cache_path_for_entry": Mock(),
+            "forecast_cache_path_for_subentry": Mock(),
             "migrate_legacy_ecmwf_meteogram_cache": Mock(),
         },
         "const": {"CONF_FORECAST_SOURCE": "forecast_source", "DOMAIN": "shmu"},
@@ -86,9 +89,17 @@ def _load_coordinator_module():
         "registry_migration": {
             "async_migrate_legacy_ecmwf_registry": AsyncMock(),
         },
+        "runtime_sources": {
+            "RuntimeSource": type("RuntimeSource", (), {}),
+        },
         "services": {
             "async_setup_services": AsyncMock(),
             "async_unload_services": AsyncMock(),
+        },
+        "subentry_migration": {
+            "MODEL_ALADIN": "aladin",
+            "MODEL_ECMWF": "ecmwf",
+            "SUBENTRY_LIVE_STATION": "live_station",
         },
     }
     for name, values in dependency_values.items():
@@ -116,6 +127,36 @@ def _load_coordinator_module():
 
 
 class TestCoordinatorForecastLifecycle(unittest.IsolatedAsyncioTestCase):
+    async def test_aladin_child_refreshes_only_its_forecast(self):
+        coordinator_module = _load_coordinator_module()
+        coordinator = object.__new__(coordinator_module.SHMUDataUpdateCoordinator)
+        coordinator._hass = object()
+        coordinator._api = None
+        coordinator.source = types.SimpleNamespace(model="aladin")
+        coordinator._async_refresh_forecast_cache = AsyncMock()
+        coordinator._async_refresh_ecmwf_meteogram_cache = AsyncMock()
+
+        result = await coordinator._async_update_data()
+
+        self.assertEqual(result, {})
+        coordinator._async_refresh_forecast_cache.assert_awaited_once_with()
+        coordinator._async_refresh_ecmwf_meteogram_cache.assert_not_awaited()
+
+    async def test_ecmwf_child_refreshes_only_its_forecast(self):
+        coordinator_module = _load_coordinator_module()
+        coordinator = object.__new__(coordinator_module.SHMUDataUpdateCoordinator)
+        coordinator._hass = object()
+        coordinator._api = None
+        coordinator.source = types.SimpleNamespace(model="ecmwf")
+        coordinator._async_refresh_forecast_cache = AsyncMock()
+        coordinator._async_refresh_ecmwf_meteogram_cache = AsyncMock()
+
+        result = await coordinator._async_update_data()
+
+        self.assertEqual(result, {})
+        coordinator._async_refresh_forecast_cache.assert_not_awaited()
+        coordinator._async_refresh_ecmwf_meteogram_cache.assert_awaited_once_with()
+
     async def test_update_refreshes_aladin_and_meteogram_before_returning_station_data(self):
         coordinator_module = _load_coordinator_module()
         coordinator = object.__new__(coordinator_module.SHMUDataUpdateCoordinator)
