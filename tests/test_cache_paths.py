@@ -92,6 +92,70 @@ class TestCachePaths(unittest.TestCase):
             cache_paths.forecast_cache_path_for_entry(_Hass(), _Entry()),
         )
 
+    def test_subentry_cache_paths_are_model_and_child_specific(self):
+        cache_paths = _load_cache_paths()
+
+        aladin = cache_paths.forecast_cache_path_for_subentry(
+            _Hass(), _Entry(), "child-a", "aladin"
+        )
+        ecmwf = cache_paths.forecast_cache_path_for_subentry(
+            _Hass(), _Entry(), "child-b", "ecmwf"
+        )
+
+        self.assertEqual(
+            aladin,
+            "/config/shmu/aladin-cache-entry-123-child-a.json",
+        )
+        self.assertEqual(
+            ecmwf,
+            "/config/shmu/ecmwf-cache-entry-123-child-b.json",
+        )
+
+    def test_subentry_cache_rejects_unknown_model(self):
+        cache_paths = _load_cache_paths()
+
+        with self.assertRaises(ValueError):
+            cache_paths.forecast_cache_path_for_subentry(
+                _Hass(), _Entry(), "child", "alaef"
+            )
+
+    def test_seeds_migrated_child_cache_without_removing_legacy(self):
+        cache_paths = _load_cache_paths()
+
+        with tempfile.TemporaryDirectory() as config_dir:
+            class Config:
+                @staticmethod
+                def path(*parts):
+                    return str(Path(config_dir, *parts))
+
+            class Hass:
+                config = Config()
+
+            legacy = Path(config_dir, "shmu", "forecast-cache-entry-123.json")
+            legacy.parent.mkdir()
+            legacy.write_text("legacy-aladin", encoding="utf-8")
+
+            self.assertTrue(
+                cache_paths.seed_subentry_cache_from_legacy(
+                    Hass(), _Entry(), "child-a", "aladin"
+                )
+            )
+            child = Path(
+                config_dir,
+                "shmu",
+                "aladin-cache-entry-123-child-a.json",
+            )
+            self.assertEqual(child.read_text(encoding="utf-8"), "legacy-aladin")
+            self.assertEqual(legacy.read_text(encoding="utf-8"), "legacy-aladin")
+
+            child.write_text("newer", encoding="utf-8")
+            self.assertFalse(
+                cache_paths.seed_subentry_cache_from_legacy(
+                    Hass(), _Entry(), "child-a", "aladin"
+                )
+            )
+            self.assertEqual(child.read_text(encoding="utf-8"), "newer")
+
     def test_migrates_legacy_ecmwf_epsgram_cache(self):
         cache_paths = _load_cache_paths()
 

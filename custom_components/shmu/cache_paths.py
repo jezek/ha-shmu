@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import shutil
 from typing import Any
 
 from .const import CONF_FORECAST_CACHE_PATH
@@ -11,6 +12,7 @@ FORECAST_CACHE_DIR = "shmu"
 FORECAST_CACHE_FILENAME_TEMPLATE = "forecast-cache-{entry_id}.json"
 ECMWF_METEOGRAM_CACHE_FILENAME_TEMPLATE = "ecmwf-meteogram-cache-{entry_id}.json"
 LEGACY_ECMWF_EPSGRAM_CACHE_FILENAME_TEMPLATE = "ecmwf-epsgram-cache-{entry_id}.json"
+SUBENTRY_CACHE_FILENAME_TEMPLATE = "{model}-cache-{entry_id}-{subentry_id}.json"
 
 
 def forecast_cache_path_for_entry(hass: Any, config_entry: Any) -> str:
@@ -34,6 +36,50 @@ def ecmwf_meteogram_cache_path_for_entry(hass: Any, config_entry: Any) -> str:
         FORECAST_CACHE_DIR,
         ECMWF_METEOGRAM_CACHE_FILENAME_TEMPLATE.format(entry_id=config_entry.entry_id),
     )
+
+
+def forecast_cache_path_for_subentry(
+    hass: Any, config_entry: Any, subentry_id: str, model: str
+) -> str:
+    """Return an independent cache path for one forecast subentry."""
+    normalized_model = model.strip().lower()
+    if normalized_model not in {"aladin", "ecmwf"}:
+        raise ValueError(f"Unsupported SHMU forecast model: {model}")
+    return hass.config.path(
+        FORECAST_CACHE_DIR,
+        SUBENTRY_CACHE_FILENAME_TEMPLATE.format(
+            model=normalized_model,
+            entry_id=config_entry.entry_id,
+            subentry_id=subentry_id,
+        ),
+    )
+
+
+def seed_subentry_cache_from_legacy(
+    hass: Any,
+    config_entry: Any,
+    subentry_id: str,
+    model: str,
+) -> bool:
+    """Copy a legacy entry cache to a migrated child's path without overwrite."""
+    normalized_model = model.strip().lower()
+    target = Path(
+        forecast_cache_path_for_subentry(
+            hass, config_entry, subentry_id, normalized_model
+        )
+    )
+    if normalized_model == "aladin":
+        source = Path(forecast_cache_path_for_entry(hass, config_entry))
+    elif normalized_model == "ecmwf":
+        source = Path(ecmwf_meteogram_cache_path_for_entry(hass, config_entry))
+    else:
+        raise ValueError(f"Unsupported SHMU forecast model: {model}")
+
+    if target.exists() or not source.exists():
+        return False
+    target.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(source, target)
+    return True
 
 
 def migrate_legacy_ecmwf_meteogram_cache(hass: Any, config_entry: Any) -> bool:
