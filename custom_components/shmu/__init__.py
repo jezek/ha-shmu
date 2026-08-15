@@ -325,7 +325,12 @@ async def async_create_source_coordinators(
     entry: ConfigEntry,
     coordinator_factory=None,
 ) -> dict[str, SHMUDataUpdateCoordinator]:
-    """Create and first-refresh one coordinator for every valid subentry."""
+    """Create and first-refresh one coordinator for every valid subentry.
+
+    A source is independent from the other children of its location.  In
+    particular, a temporarily unavailable live observation must not prevent
+    forecast sources from being available.
+    """
     factory = coordinator_factory or SHMUDataUpdateCoordinator
     coordinators: dict[str, SHMUDataUpdateCoordinator] = {}
     for source in runtime_sources(entry.subentries.values()):
@@ -338,6 +343,16 @@ async def async_create_source_coordinators(
                 source.model,
             )
         coordinator = factory(hass, entry, source)
-        await coordinator.async_config_entry_first_refresh()
+        try:
+            await coordinator.async_config_entry_first_refresh()
+        except Exception as err:
+            _LOGGER.warning(
+                "Unable to initialize SHMU source %s (%s); continuing with "
+                "the remaining sources: %s",
+                source.subentry_id,
+                source.source_id,
+                err,
+            )
+            continue
         coordinators[source.subentry_id] = coordinator
     return coordinators

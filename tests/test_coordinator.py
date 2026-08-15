@@ -267,6 +267,60 @@ class TestCoordinatorForecastLifecycle(unittest.IsolatedAsyncioTestCase):
             "ecmwf",
         )
 
+    async def test_failed_live_child_does_not_block_meteogram_children(self):
+        coordinator_module = _load_coordinator_module()
+        live = types.SimpleNamespace(
+            subentry_id="live",
+            source_id="11816",
+            model=None,
+            preserve_legacy_ids=False,
+        )
+        aladin = types.SimpleNamespace(
+            subentry_id="aladin",
+            source_id="31396",
+            model="aladin",
+            preserve_legacy_ids=False,
+        )
+        ecmwf = types.SimpleNamespace(
+            subentry_id="ecmwf",
+            source_id="31396",
+            model="ecmwf",
+            preserve_legacy_ids=False,
+        )
+        coordinator_module.runtime_sources.return_value = [live, aladin, ecmwf]
+        hass = types.SimpleNamespace(async_add_executor_job=AsyncMock())
+        entry = types.SimpleNamespace(
+            subentries={"live": live, "aladin": aladin, "ecmwf": ecmwf}
+        )
+        coordinators = {
+            "live": types.SimpleNamespace(
+                source=live,
+                async_config_entry_first_refresh=AsyncMock(
+                    side_effect=ValueError("No data found for station ID: 11816")
+                ),
+            ),
+            "aladin": types.SimpleNamespace(
+                source=aladin, async_config_entry_first_refresh=AsyncMock()
+            ),
+            "ecmwf": types.SimpleNamespace(
+                source=ecmwf, async_config_entry_first_refresh=AsyncMock()
+            ),
+        }
+
+        result = await coordinator_module.async_create_source_coordinators(
+            hass,
+            entry,
+            lambda _hass, _entry, source: coordinators[source.subentry_id],
+        )
+
+        self.assertEqual(
+            result,
+            {"aladin": coordinators["aladin"], "ecmwf": coordinators["ecmwf"]},
+        )
+        coordinators["live"].async_config_entry_first_refresh.assert_awaited_once_with()
+        coordinators["aladin"].async_config_entry_first_refresh.assert_awaited_once_with()
+        coordinators["ecmwf"].async_config_entry_first_refresh.assert_awaited_once_with()
+
     async def test_empty_parent_creates_no_source_coordinators(self):
         coordinator_module = _load_coordinator_module()
         coordinator_module.runtime_sources.return_value = []
