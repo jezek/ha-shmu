@@ -97,7 +97,12 @@ class SHMUMeteogramSensor(CoordinatorEntity, SensorEntity):
         self._attr_icon = "mdi:image"
         self._meteogram_id = meteogram_id or "32737"  # Default meteogram ID
 
-        self._attr_device_info = station_device_info(coordinator)
+        source = getattr(coordinator, "source", None)
+        self._attr_device_info = (
+            forecast_device_info(coordinator)
+            if source and source.model == MODEL_ALADIN
+            else station_device_info(coordinator)
+        )
 
     def _generate_meteogram_url(self):
         """Generate the meteogram URL based on current time."""

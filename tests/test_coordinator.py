@@ -102,6 +102,7 @@ def _load_coordinator_module():
             "leading_day_aladin_fallback_job": Mock(),
         },
         "registry_migration": {
+            "async_migrate_aladin_source_devices": AsyncMock(),
             "async_migrate_legacy_ecmwf_registry": AsyncMock(),
         },
         "runtime_sources": {
@@ -197,7 +198,7 @@ class TestCoordinatorForecastLifecycle(unittest.IsolatedAsyncioTestCase):
             config_entries=config_entries,
             async_add_executor_job=AsyncMock(),
         )
-        entry = types.SimpleNamespace(entry_id="entry")
+        entry = types.SimpleNamespace(entry_id="entry", subentries={})
 
         result = await coordinator_module.async_setup_entry(hass, entry)
 
@@ -315,7 +316,7 @@ class TestCoordinatorForecastLifecycle(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(
             result,
-            {"aladin": coordinators["aladin"], "ecmwf": coordinators["ecmwf"]},
+            coordinators,
         )
         coordinators["live"].async_config_entry_first_refresh.assert_awaited_once_with()
         coordinators["aladin"].async_config_entry_first_refresh.assert_awaited_once_with()

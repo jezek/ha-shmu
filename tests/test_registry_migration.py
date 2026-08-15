@@ -43,6 +43,7 @@ def _load_registry_migration(entity_registry, device_registry):
     device_registry_module.async_get = Mock(return_value=device_registry)
     entity_registry_module = types.ModuleType("homeassistant.helpers.entity_registry")
     entity_registry_module.async_get = Mock(return_value=entity_registry)
+    entity_registry_module.async_entries_for_device = Mock(return_value=[])
     helpers.device_registry = device_registry_module
     helpers.entity_registry = entity_registry_module
     sys.modules["homeassistant"] = homeassistant
@@ -124,6 +125,54 @@ class TestRegistryMigration(unittest.IsolatedAsyncioTestCase):
 
         entity_registry.async_update_entity.assert_not_called()
         device_registry.async_update_device.assert_not_called()
+
+    async def test_merges_url_only_aladin_device_into_forecast_device(self):
+        entity_registry = Mock()
+        device_registry = Mock()
+        legacy_device = types.SimpleNamespace(id="url-device")
+        forecast_device = types.SimpleNamespace(id="forecast-device")
+        device_registry.async_get_device.side_effect = (
+            lambda *, identifiers: (
+                forecast_device
+                if any(value.endswith("_forecast") for _, value in identifiers)
+                else legacy_device
+            )
+        )
+        migration = _load_registry_migration(entity_registry, device_registry)
+        migration.er.async_entries_for_device.return_value = [
+            types.SimpleNamespace(entity_id="sensor.shmu_meteogram_url")
+        ]
+        source = types.SimpleNamespace(
+            subentry_id="aladin", model="aladin", preserve_legacy_ids=False
+        )
+
+        await migration.async_migrate_aladin_source_devices(
+            object(), "entry-123", [source]
+        )
+
+        entity_registry.async_update_entity.assert_called_once_with(
+            "sensor.shmu_meteogram_url", device_id="forecast-device"
+        )
+        device_registry.async_remove_device.assert_called_once_with("url-device")
+
+    async def test_renames_url_only_device_when_forecast_device_is_absent(self):
+        entity_registry = Mock()
+        device_registry = Mock()
+        legacy_device = types.SimpleNamespace(id="url-device")
+        device_registry.async_get_device.side_effect = [legacy_device, None]
+        migration = _load_registry_migration(entity_registry, device_registry)
+        source = types.SimpleNamespace(
+            subentry_id="aladin", model="aladin", preserve_legacy_ids=False
+        )
+
+        await migration.async_migrate_aladin_source_devices(
+            object(), "entry-123", [source]
+        )
+
+        device_registry.async_update_device.assert_called_once_with(
+            "url-device",
+            new_identifiers={("shmu", "entry-123_aladin_forecast")},
+        )
 
 
 if __name__ == "__main__":

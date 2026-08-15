@@ -22,7 +22,10 @@ from .forecast_jobs import (
     forecast_cache_update_job,
     leading_day_aladin_fallback_job,
 )
-from .registry_migration import async_migrate_legacy_ecmwf_registry
+from .registry_migration import (
+    async_migrate_aladin_source_devices,
+    async_migrate_legacy_ecmwf_registry,
+)
 from .runtime_sources import RuntimeSource, runtime_sources
 from .subentry_migration import (
     MODEL_ALADIN,
@@ -70,6 +73,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up SHMU integration from a config entry."""
     hass.data.setdefault(DOMAIN, {})
     await async_migrate_legacy_ecmwf_registry(hass, entry.entry_id)
+    await async_migrate_aladin_source_devices(
+        hass, entry.entry_id, runtime_sources(entry.subentries.values())
+    )
     await hass.async_add_executor_job(
         migrate_legacy_ecmwf_meteogram_cache,
         hass,
@@ -347,12 +353,14 @@ async def async_create_source_coordinators(
             await coordinator.async_config_entry_first_refresh()
         except Exception as err:
             _LOGGER.warning(
-                "Unable to initialize SHMU source %s (%s); continuing with "
-                "the remaining sources: %s",
+                "SHMU source %s (%s) is unavailable during initialization; "
+                "registering its entities as unavailable and continuing: %s",
                 source.subentry_id,
                 source.source_id,
                 err,
             )
-            continue
+            # Keep the coordinator so its entities and device are registered as
+            # unavailable.  Later scheduled/manual refreshes can recover it
+            # without requiring another integration reload.
         coordinators[source.subentry_id] = coordinator
     return coordinators
