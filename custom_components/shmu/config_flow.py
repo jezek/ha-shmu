@@ -107,6 +107,12 @@ class SHMUSubentryFlow(config_entries.ConfigSubentryFlow):
             for subentry in self._get_entry().subentries.values()
         )
 
+    def _create_source_entry(self, **kwargs: Any) -> FlowResult:
+        """Create a source and reload its already-loaded parent entry."""
+        entry = self._get_entry()
+        self.hass.config_entries.async_schedule_reload(entry.entry_id)
+        return self.async_create_entry(**kwargs)
+
     async def async_step_live_station(self, user_input=None):
         """Add one independently selected current-observation station."""
         try:
@@ -123,7 +129,7 @@ class SHMUSubentryFlow(config_entries.ConfigSubentryFlow):
                 if self._duplicate(unique_id):
                     errors["base"] = "already_configured"
                 else:
-                    return self.async_create_entry(
+                    return self._create_source_entry(
                         title=station.label,
                         unique_id=unique_id,
                         data={"station_id": station.value, "station_name": station.label},
@@ -184,7 +190,7 @@ class SHMUSubentryFlow(config_entries.ConfigSubentryFlow):
                 if self._duplicate(unique_id):
                     errors["base"] = "already_configured"
                 else:
-                    return self.async_create_entry(
+                    return self._create_source_entry(
                         title=f"{area.label} — {self._model.upper()}",
                         unique_id=unique_id,
                         data={
