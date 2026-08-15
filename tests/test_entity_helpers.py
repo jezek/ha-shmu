@@ -81,10 +81,50 @@ class TestEntityHelpers(unittest.TestCase):
         self.assertEqual(station_info["name"], "SHMU Station 11815")
         self.assertEqual(
             forecast_info["identifiers"],
-            {("shmu", "entry-123_forecast-child")},
+            {("shmu", "entry-123_forecast-child_forecast")},
         )
         self.assertEqual(forecast_info["name"], "SHMU Forecast 31396")
         self.assertNotIn("via_device", forecast_info)
+
+    def test_new_live_aladin_and_ecmwf_children_use_three_devices(self):
+        helpers = _load_entity_helpers()
+        source_type = types.SimpleNamespace
+
+        coordinators = [
+            (
+                helpers.station_device_info,
+                source_type(
+                    subentry_id="live", source_id="11813", preserve_legacy_ids=False
+                ),
+            ),
+            (
+                helpers.forecast_device_info,
+                source_type(
+                    subentry_id="aladin", source_id="31396", preserve_legacy_ids=False
+                ),
+            ),
+            (
+                helpers.ecmwf_meteogram_device_info,
+                source_type(
+                    subentry_id="ecmwf", source_id="31396", preserve_legacy_ids=False
+                ),
+            ),
+        ]
+
+        identifiers = {
+            factory(types.SimpleNamespace(config_entry=_ConfigEntry(), source=source))["identifiers"]
+            .pop()
+            for factory, source in coordinators
+        }
+
+        self.assertEqual(
+            identifiers,
+            {
+                ("shmu", "entry-123_live"),
+                ("shmu", "entry-123_aladin_forecast"),
+                ("shmu", "entry-123_ecmwf_ecmwf_meteogram"),
+            },
+        )
 
     def test_migrated_child_retains_legacy_forecast_device(self):
         helpers = _load_entity_helpers()

@@ -118,7 +118,7 @@ class TestRuntimeSources(unittest.TestCase):
             module.source_device_identifier(
                 "shmu", "entry-123", source, "forecast"
             ),
-            ("shmu", "entry-123_01K123"),
+            ("shmu", "entry-123_01K123_forecast"),
         )
 
 

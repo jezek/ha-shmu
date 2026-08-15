@@ -83,4 +83,7 @@ def source_device_identifier(
         if legacy_suffix:
             identifier = f"{identifier}_{legacy_suffix}"
         return domain, identifier
-    return domain, f"{entry_id}_{source.subentry_id}"
+    identifier = f"{entry_id}_{source.subentry_id}"
+    if legacy_suffix:
+        identifier = f"{identifier}_{legacy_suffix}"
+    return domain, identifier
