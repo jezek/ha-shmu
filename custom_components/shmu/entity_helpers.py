@@ -71,11 +71,16 @@ def forecast_device_info(coordinator) -> DeviceInfo:
     """Return device metadata for cache-backed SHMU forecast entities."""
     source = _source(coordinator)
     area_id = source.source_id if source else coordinator.config_entry.data["station_id"]
+    area_name = (
+        getattr(source, "display_name", "") or area_id
+        if source
+        else coordinator.config_entry.data.get("area_name", area_id)
+    )
     values = dict(
         identifiers={_identifier(coordinator, "forecast")},
-        name=f"SHMU Forecast {area_id}",
+        name=f"SHMU ALADIN {area_name}",
         manufacturer="Slovenský hydrometeorologický ústav",
-        model="ALADIN SK 4.5 km Forecast Cache",
+        model="ALADIN 3-day Forecast",
         configuration_url=(
             "https://opendata.shmu.sk/meteorology/weather/nwp/aladin/sk/4.5km"
         ),

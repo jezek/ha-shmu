@@ -77,6 +77,7 @@ class TestEntityHelpers(unittest.TestCase):
             source=source_type(
                 subentry_id="forecast-child",
                 source_id="31396",
+                display_name="Pezinok",
                 preserve_legacy_ids=False,
             ),
         )
@@ -93,7 +94,8 @@ class TestEntityHelpers(unittest.TestCase):
             forecast_info["identifiers"],
             {("shmu", "entry-123_forecast-child_forecast")},
         )
-        self.assertEqual(forecast_info["name"], "SHMU Forecast 31396")
+        self.assertEqual(forecast_info["name"], "SHMU ALADIN Pezinok")
+        self.assertEqual(forecast_info["model"], "ALADIN 3-day Forecast")
         self.assertNotIn("via_device", forecast_info)
 
     def test_new_live_aladin_and_ecmwf_children_use_three_devices(self):
@@ -202,7 +204,7 @@ class TestEntityHelpers(unittest.TestCase):
         )
         self.assertEqual(forecast_info["identifiers"], {("shmu", "entry-123_forecast")})
         self.assertEqual(forecast_info["via_device"], ("shmu", "entry-123"))
-        self.assertEqual(forecast_info["model"], "ALADIN SK 4.5 km Forecast Cache")
+        self.assertEqual(forecast_info["model"], "ALADIN 3-day Forecast")
         self.assertEqual(
             forecast_info["configuration_url"],
             "https://opendata.shmu.sk/meteorology/weather/nwp/aladin/sk/4.5km",
