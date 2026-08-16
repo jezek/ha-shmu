@@ -50,9 +50,14 @@ def station_device_info(coordinator) -> DeviceInfo:
     station_id = (
         source.source_id if source else coordinator.config_entry.data["station_id"]
     )
+    station_name = (
+        getattr(source, "display_name", "") or station_id
+        if source
+        else coordinator.config_entry.data.get("station_name", station_id)
+    )
     return DeviceInfo(
         identifiers={_identifier(coordinator)},
-        name=f"SHMU Station {station_id}",
+        name=f"SHMU Station {station_name}",
         manufacturer="Slovenský hydrometeorologický ústav",
         model="Weather Station",
         configuration_url=(

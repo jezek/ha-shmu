@@ -68,6 +68,7 @@ class TestEntityHelpers(unittest.TestCase):
             source=source_type(
                 subentry_id="live-child",
                 source_id="11815",
+                display_name="Pezinok - Grinava",
                 preserve_legacy_ids=False,
             ),
         )
@@ -87,7 +88,7 @@ class TestEntityHelpers(unittest.TestCase):
             station_info["identifiers"],
             {("shmu", "entry-123_live-child")},
         )
-        self.assertEqual(station_info["name"], "SHMU Station 11815")
+        self.assertEqual(station_info["name"], "SHMU Station Pezinok - Grinava")
         self.assertEqual(
             forecast_info["identifiers"],
             {("shmu", "entry-123_forecast-child_forecast")},
