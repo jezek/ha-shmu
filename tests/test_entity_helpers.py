@@ -50,6 +50,15 @@ class _Coordinator:
 
 
 class TestEntityHelpers(unittest.TestCase):
+    def test_aladin_meteogram_page_url_targets_selected_area(self):
+        helpers = _load_entity_helpers()
+
+        self.assertEqual(
+            helpers.aladin_meteogram_page_url("31396"),
+            "https://www.shmu.sk/sk/"
+            "?id=meteo_num_mgram&nwp_mesto=31396&page=1",
+        )
+
     def test_new_children_have_independent_subentry_devices(self):
         helpers = _load_entity_helpers()
         source_type = types.SimpleNamespace

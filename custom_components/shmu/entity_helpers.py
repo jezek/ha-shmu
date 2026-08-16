@@ -12,6 +12,14 @@ def _source(coordinator):
     return getattr(coordinator, "source", None)
 
 
+def aladin_meteogram_page_url(area_id: str) -> str:
+    """Return the current official ALADIN meteogram page for an area."""
+    return (
+        "https://www.shmu.sk/sk/"
+        f"?id=meteo_num_mgram&nwp_mesto={area_id}&page=1"
+    )
+
+
 def _identifier(coordinator, legacy_suffix: str | None = None):
     source = _source(coordinator)
     entry_id = coordinator.config_entry.entry_id

@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from .cache_paths import forecast_cache_path_for_entry
 from .const import DOMAIN
 from .entity_helpers import (
+    aladin_meteogram_page_url,
     ecmwf_meteogram_device_info,
     entity_unique_id,
     forecast_device_info,
@@ -86,7 +87,7 @@ class SHMUMeteogramSensor(CoordinatorEntity, SensorEntity):
     def __init__(self, coordinator, meteogram_id=None):
         """Initialize the meteogram URL sensor."""
         super().__init__(coordinator)
-        self._attr_name = "SHMU Meteogram URL"
+        self._attr_name = "Meteogram URL"
         self._attr_unique_id = entity_unique_id(
             coordinator,
             "meteogram_url",
@@ -137,7 +138,7 @@ class SHMUMeteogramSensor(CoordinatorEntity, SensorEntity):
     @property
     def native_value(self):
         """Return the meteogram URL."""
-        return "Meteogram URL"
+        return aladin_meteogram_page_url(self._meteogram_id)
 
     @property
     def extra_state_attributes(self):
