@@ -90,10 +90,7 @@ def ecmwf_meteogram_device_info(coordinator) -> DeviceInfo:
         ),
         manufacturer="Slovenský hydrometeorologický ústav",
         model="ECMWF 10-day Meteogram Forecast Cache",
-        configuration_url=(
-            "https://www.shmu.sk/sk/"
-            f"?id=meteo_num_mgram10&nwp_mesto={meteogram_id}&page=1"
-        ),
+        configuration_url="https://www.shmu.sk/data/datanwp/json/ecmwf/",
         sw_version="1.0",
     )
     if source is None or source.preserve_legacy_ids:

@@ -219,8 +219,7 @@ class TestEntityHelpers(unittest.TestCase):
         self.assertEqual(ecmwf_info["model"], "ECMWF 10-day Meteogram Forecast Cache")
         self.assertEqual(
             ecmwf_info["configuration_url"],
-            "https://www.shmu.sk/sk/"
-            "?id=meteo_num_mgram10&nwp_mesto=32737&page=1",
+            "https://www.shmu.sk/data/datanwp/json/ecmwf/",
         )
 
 
