@@ -20,6 +20,7 @@ class RuntimeSource:
     source_id: str
     model: str | None
     preserve_legacy_ids: bool = False
+    display_name: str = ""
 
 
 def runtime_sources(subentries: Iterable[Any]) -> list[RuntimeSource]:
@@ -37,6 +38,7 @@ def runtime_sources(subentries: Iterable[Any]) -> list[RuntimeSource]:
                         source_id=station_id,
                         model=None,
                         preserve_legacy_ids=bool(data.get("preserve_legacy_ids")),
+                        display_name=str(data.get("station_name") or station_id),
                     )
                 )
             continue
@@ -54,6 +56,7 @@ def runtime_sources(subentries: Iterable[Any]) -> list[RuntimeSource]:
                 source_id=area_id,
                 model=model,
                 preserve_legacy_ids=bool(data.get("preserve_legacy_ids")),
+                display_name=str(data.get("area_name") or area_id),
             )
         )
     return result

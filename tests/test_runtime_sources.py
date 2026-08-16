@@ -42,8 +42,16 @@ class TestRuntimeSources(unittest.TestCase):
         module = _load_module()
         sources = module.runtime_sources(
             [
-                _Subentry("z", "meteogram", {"model": "ecmwf", "area_id": "31396"}),
-                _Subentry("a", "live_station", {"station_id": "11815"}),
+                _Subentry(
+                    "z",
+                    "meteogram",
+                    {"model": "ecmwf", "area_id": "31396", "area_name": "Pezinok"},
+                ),
+                _Subentry(
+                    "a",
+                    "live_station",
+                    {"station_id": "11815", "station_name": "Pezinok - Grinava"},
+                ),
                 _Subentry("m", "meteogram", {"model": "aladin", "area_id": "32737"}),
             ]
         )
@@ -51,6 +59,10 @@ class TestRuntimeSources(unittest.TestCase):
         self.assertEqual([source.subentry_id for source in sources], ["a", "m", "z"])
         self.assertEqual([source.source_id for source in sources], ["11815", "32737", "31396"])
         self.assertEqual([source.model for source in sources], [None, "aladin", "ecmwf"])
+        self.assertEqual(
+            [source.display_name for source in sources],
+            ["Pezinok - Grinava", "32737", "Pezinok"],
+        )
 
     def test_invalid_or_unknown_children_are_ignored(self):
         module = _load_module()
