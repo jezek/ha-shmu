@@ -100,14 +100,16 @@ def ecmwf_meteogram_device_info(coordinator) -> DeviceInfo:
         if source
         else coordinator.config_entry.data.get("meteogram_id", station_id)
     )
+    area_name = (
+        getattr(source, "display_name", "") or meteogram_id
+        if source
+        else coordinator.config_entry.data.get("area_name", station_id)
+    )
     values = dict(
         identifiers={_identifier(coordinator, "ecmwf_meteogram")},
-        name=(
-            f"SHMU ECMWF 10-day meteogram "
-            f"{meteogram_id if source else station_id}"
-        ),
+        name=f"SHMU ECMWF {area_name}",
         manufacturer="Slovenský hydrometeorologický ústav",
-        model="ECMWF 10-day Meteogram Forecast Cache",
+        model="ECMWF 10-day Forecast",
         configuration_url="https://www.shmu.sk/data/datanwp/json/ecmwf/",
         sw_version="1.0",
     )

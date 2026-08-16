@@ -84,6 +84,17 @@ class TestEntityHelpers(unittest.TestCase):
 
         station_info = helpers.station_device_info(live_coordinator)
         forecast_info = helpers.forecast_device_info(forecast_coordinator)
+        ecmwf_info = helpers.ecmwf_meteogram_device_info(
+            types.SimpleNamespace(
+                config_entry=_ConfigEntry(),
+                source=source_type(
+                    subentry_id="ecmwf-child",
+                    source_id="31396",
+                    display_name="Pezinok",
+                    preserve_legacy_ids=False,
+                ),
+            )
+        )
 
         self.assertEqual(
             station_info["identifiers"],
@@ -96,6 +107,8 @@ class TestEntityHelpers(unittest.TestCase):
         )
         self.assertEqual(forecast_info["name"], "SHMU ALADIN Pezinok")
         self.assertEqual(forecast_info["model"], "ALADIN 3-day Forecast")
+        self.assertEqual(ecmwf_info["name"], "SHMU ECMWF Pezinok")
+        self.assertEqual(ecmwf_info["model"], "ECMWF 10-day Forecast")
         self.assertNotIn("via_device", forecast_info)
 
     def test_new_live_aladin_and_ecmwf_children_use_three_devices(self):
@@ -226,9 +239,9 @@ class TestEntityHelpers(unittest.TestCase):
         self.assertEqual(ecmwf_info["via_device"], ("shmu", "entry-123"))
         self.assertEqual(
             ecmwf_info["name"],
-            "SHMU ECMWF 10-day meteogram 11813",
+            "SHMU ECMWF 11813",
         )
-        self.assertEqual(ecmwf_info["model"], "ECMWF 10-day Meteogram Forecast Cache")
+        self.assertEqual(ecmwf_info["model"], "ECMWF 10-day Forecast")
         self.assertEqual(
             ecmwf_info["configuration_url"],
             "https://www.shmu.sk/data/datanwp/json/ecmwf/",
