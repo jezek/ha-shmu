@@ -47,6 +47,9 @@ def station_device_info(coordinator) -> DeviceInfo:
         name=f"SHMU Station {station_id}",
         manufacturer="Slovenský hydrometeorologický ústav",
         model="Weather Station",
+        configuration_url=(
+            "https://opendata.shmu.sk/meteorology/climate/now/data/"
+        ),
         sw_version="1.0",
     )
 

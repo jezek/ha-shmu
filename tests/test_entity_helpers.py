@@ -186,6 +186,10 @@ class TestEntityHelpers(unittest.TestCase):
         forecast_info = helpers.forecast_device_info(_Coordinator())
 
         self.assertEqual(station_info["identifiers"], {("shmu", "entry-123")})
+        self.assertEqual(
+            station_info["configuration_url"],
+            "https://opendata.shmu.sk/meteorology/climate/now/data/",
+        )
         self.assertEqual(forecast_info["identifiers"], {("shmu", "entry-123_forecast")})
         self.assertEqual(forecast_info["via_device"], ("shmu", "entry-123"))
         self.assertEqual(forecast_info["model"], "ALADIN SK 4.5 km Forecast Cache")
