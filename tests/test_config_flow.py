@@ -152,5 +152,29 @@ class TestSubentryReload(unittest.TestCase):
         )
 
 
+class TestMeteogramAssociation(unittest.IsolatedAsyncioTestCase):
+    async def test_create_persists_optional_live_station_association(self):
+        module = _load_config_flow()
+        flow = module.SHMUSubentryFlow()
+        flow._model = "aladin"
+        flow._areas = [types.SimpleNamespace(value="pezinok", label="Pezinok")]
+        flow._stations = [types.SimpleNamespace(value="11816", label="Pezinok")]
+        flow._duplicate = Mock(return_value=False)
+        flow._create_source_entry = Mock(return_value={"type": "create_entry"})
+
+        await flow.async_step_meteogram_area(
+            {
+                "area_id": "pezinok",
+                "live_station_subentry_id": "live-child-id",
+            }
+        )
+
+        self.assertEqual(
+            flow._create_source_entry.call_args.kwargs["data"]
+            ["live_station_subentry_id"],
+            "live-child-id",
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

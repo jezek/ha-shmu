@@ -54,7 +54,14 @@
         "meteogram_area": {
           "title": "Vyberte oblasť meteogramu",
           "data": {
-            "area_id": "Oblasť predpovede"
+            "area_id": "Oblasť predpovede",
+            "live_station_subentry_id": "Stanica aktuálneho pozorovania (voliteľné)"
+          }
+        },
+        "reconfigure": {
+          "title": "Upraviť priradenie stanice k predpovedi",
+          "data": {
+            "live_station_subentry_id": "Stanica aktuálneho pozorovania (voliteľné)"
           }
         }
       },
@@ -63,7 +70,8 @@
       },
       "error": {
         "invalid_item": "Vybraná oblasť nie je v aktuálnom oficiálnom katalógu.",
-        "already_configured": "Táto kombinácia modelu a oblasti už je v lokalite pridaná."
+        "already_configured": "Táto kombinácia modelu a oblasti už je v lokalite pridaná.",
+        "invalid_station": "Vyberte stanicu aktuálneho pozorovania z tejto lokality."
       }
     }
   },

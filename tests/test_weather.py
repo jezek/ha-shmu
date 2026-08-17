@@ -106,7 +106,9 @@ class _Coordinator:
 class TestECMWFWeather(unittest.TestCase):
     def test_condition_uses_ecmwf_rows_and_observed_precipitation(self):
         weather, current_condition = _load_weather()
-        entity = weather.SHMUECMWFMeteogramWeather(_Coordinator(), "/tmp/ecmwf.json")
+        entity = weather.SHMUECMWFMeteogramWeather(
+            _Coordinator(), "/tmp/ecmwf.json", _Coordinator()
+        )
         entity.hass = object()
 
         self.assertEqual(entity.condition, "partlycloudy")
@@ -117,7 +119,9 @@ class TestECMWFWeather(unittest.TestCase):
 
     def test_exposes_known_current_station_weather_fields(self):
         weather, _ = _load_weather()
-        entity = weather.SHMUECMWFMeteogramWeather(_Coordinator(), "/tmp/ecmwf.json")
+        entity = weather.SHMUECMWFMeteogramWeather(
+            _Coordinator(), "/tmp/ecmwf.json", _Coordinator()
+        )
 
         self.assertEqual(entity.native_temperature, 21.5)
         self.assertEqual(entity.native_pressure, 1012.4)
@@ -127,6 +131,17 @@ class TestECMWFWeather(unittest.TestCase):
         self.assertEqual(entity.wind_bearing, 245.0)
         self.assertEqual(entity.native_visibility, 20000.0)
         self.assertEqual(entity._attr_native_visibility_unit, "m")
+
+    def test_hides_current_station_fields_without_association(self):
+        weather, current_condition = _load_weather()
+        entity = weather.SHMUECMWFMeteogramWeather(_Coordinator(), "/tmp/ecmwf.json")
+        entity.hass = object()
+
+        self.assertIsNone(entity.native_temperature)
+        self.assertIsNone(entity.native_pressure)
+        self.assertIsNone(entity.humidity)
+        self.assertEqual(entity.condition, "partlycloudy")
+        self.assertIsNone(current_condition.call_args.args[2])
 
 
 class TestWeatherPlatformRouting(unittest.IsolatedAsyncioTestCase):

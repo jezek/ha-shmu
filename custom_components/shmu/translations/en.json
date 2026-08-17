@@ -54,7 +54,14 @@
         "meteogram_area": {
           "title": "Choose a meteogram area",
           "data": {
-            "area_id": "Forecast area"
+            "area_id": "Forecast area",
+            "live_station_subentry_id": "Current-observation station (optional)"
+          }
+        },
+        "reconfigure": {
+          "title": "Edit forecast station association",
+          "data": {
+            "live_station_subentry_id": "Current-observation station (optional)"
           }
         }
       },
@@ -63,7 +70,8 @@
       },
       "error": {
         "invalid_item": "The selected area is not in the current official catalogue.",
-        "already_configured": "This model and area are already added to the location."
+        "already_configured": "This model and area are already added to the location.",
+        "invalid_station": "Select a current-observation station from this location."
       }
     }
   },

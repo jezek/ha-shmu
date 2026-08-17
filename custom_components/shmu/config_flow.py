@@ -205,6 +205,9 @@ class SHMUSubentryFlow(config_entries.ConfigSubentryFlow):
                             "model": self._model,
                             "area_id": area.value,
                             "area_name": area.label,
+                            "live_station_subentry_id": user_input.get(
+                                "live_station_subentry_id", ""
+                            ),
                         },
                     )
         return self.async_show_form(
@@ -217,7 +220,14 @@ class SHMUSubentryFlow(config_entries.ConfigSubentryFlow):
                             custom_value=True,
                             sort=True,
                         )
-                    )
+                    ),
+                    vol.Optional("live_station_subentry_id", default=""): SelectSelector(
+                        SelectSelectorConfig(
+                            options=self._live_station_options(),
+                            custom_value=False,
+                            sort=True,
+                        )
+                    ),
                 }
             ),
             errors=errors,
@@ -228,6 +238,42 @@ class SHMUSubentryFlow(config_entries.ConfigSubentryFlow):
         if self._subentry_type == SUBENTRY_METEOGRAM:
             return await self.async_step_meteogram(user_input)
         return await self.async_step_live_station(user_input)
+
+    async def async_step_reconfigure(self, user_input=None):
+        """Edit an optional live-station association on a forecast source."""
+        subentry = self._get_reconfigure_subentry()
+        if subentry.subentry_type != SUBENTRY_METEOGRAM:
+            return self.async_abort(reason="reconfigure_not_supported")
+
+        station_options = self._live_station_options()
+        valid_station_ids = {option["value"] for option in station_options}
+        if user_input is not None:
+            station_id = user_input.get("live_station_subentry_id", "")
+            if not station_id or station_id in valid_station_ids:
+                return self.async_update_reload_and_abort(
+                    self._get_entry(),
+                    subentry,
+                    data_updates={"live_station_subentry_id": station_id},
+                )
+
+        return self.async_show_form(
+            step_id="reconfigure",
+            data_schema=vol.Schema(
+                {
+                    vol.Optional(
+                        "live_station_subentry_id",
+                        default=subentry.data.get("live_station_subentry_id", ""),
+                    ): SelectSelector(
+                        SelectSelectorConfig(
+                            options=station_options,
+                            custom_value=False,
+                            sort=True,
+                        )
+                    )
+                }
+            ),
+            errors={"base": "invalid_station"} if user_input is not None else {},
+        )
 
 
 class SHMUOptionsFlowHandler(config_entries.OptionsFlowWithReload):

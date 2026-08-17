@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, tzinfo
 import json
 import os
 from pathlib import Path
@@ -234,34 +234,56 @@ def rows_as_daily_forecast(
     historical_temperatures: dict[datetime, float] | None = None,
     reference_time: datetime | None = None,
     require_hourly_coverage: bool = True,
+    time_zone: tzinfo | None = None,
 ) -> list[dict[str, Any]]:
-    """Aggregate normalized rows into Home Assistant-style daily forecast dicts."""
-    historical_by_day = _historical_temperatures_by_day(historical_temperatures or {})
+    """Aggregate rows into daily forecasts in the presentation time zone.
+
+    Forecast rows are UTC, but Home Assistant presents daily cards in its
+    configured local time zone.  Grouping by UTC would put a 23:00 UTC shower
+    on the previous local calendar day.
+    """
+    presentation_time_zone = time_zone or timezone.utc
+    historical_by_day = _historical_temperatures_by_day(
+        historical_temperatures or {}, presentation_time_zone
+    )
     days: dict[str, list[ForecastRow]] = {}
     for row in sorted(rows, key=lambda row: row.valid_time):
-        day_key = row.valid_time.date().isoformat()
+        day_key = row.valid_time.astimezone(presentation_time_zone).date().isoformat()
         days.setdefault(day_key, []).append(row)
 
     forecasts: list[dict[str, Any]] = []
-    row_times = {row.valid_time for row in rows}
+    row_times = {
+        row.valid_time.astimezone(presentation_time_zone).replace(
+            minute=0, second=0, microsecond=0
+        )
+        for row in rows
+    }
     initial_day = min(days, default=None)
     for day_key, day_rows in days.items():
         historical_day = (
             historical_by_day.get(day_key, {}) if day_key == initial_day else {}
         )
-        covered_hours = {row.valid_time.hour for row in day_rows} | set(historical_day)
+        covered_hours = {
+            row.valid_time.astimezone(presentation_time_zone).hour for row in day_rows
+        } | set(historical_day)
         if require_hourly_coverage:
             if covered_hours != set(range(24)):
                 continue
         else:
-            day_start = datetime.fromisoformat(day_key).replace(tzinfo=timezone.utc)
+            day_start = datetime.fromisoformat(day_key).replace(
+                tzinfo=presentation_time_zone
+            )
             if day_start not in row_times or day_start + timedelta(days=1) not in row_times:
                 continue
         temperatures = [row.temperature for row in day_rows if row.temperature is not None]
         temperatures.extend(
             temperature
             for hour, temperature in historical_day.items()
-            if hour not in {row.valid_time.hour for row in day_rows}
+            if hour
+            not in {
+                row.valid_time.astimezone(presentation_time_zone).hour
+                for row in day_rows
+            }
         )
         precipitation = [
             row.precipitation_amount
@@ -281,7 +303,11 @@ def rows_as_daily_forecast(
         )
 
         forecast: dict[str, Any] = {
-            "datetime": f"{day_key}T12:00:00Z",
+            "datetime": _format_datetime(
+                datetime.fromisoformat(day_key).replace(
+                    hour=12, tzinfo=presentation_time_zone
+                )
+            ),
             "condition": (
                 "rainy" if has_rain else _condition_for_cloud_cover(average_cloud_cover)
             ),
@@ -540,13 +566,14 @@ def _has_full_day_coverage(rows: list[ForecastRow]) -> bool:
 
 def _historical_temperatures_by_day(
     values: dict[datetime, float],
+    presentation_time_zone: tzinfo = timezone.utc,
 ) -> dict[str, dict[int, float]]:
     by_day: dict[str, dict[int, float]] = {}
     for timestamp, temperature in values.items():
-        timestamp_utc = _as_aware_utc(timestamp)
-        by_day.setdefault(timestamp_utc.date().isoformat(), {})[timestamp_utc.hour] = float(
-            temperature
-        )
+        local_timestamp = _as_aware_utc(timestamp).astimezone(presentation_time_zone)
+        by_day.setdefault(local_timestamp.date().isoformat(), {})[
+            local_timestamp.hour
+        ] = float(temperature)
     return by_day
 
 
