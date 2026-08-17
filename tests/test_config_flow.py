@@ -126,6 +126,31 @@ class TestSubentryReload(unittest.TestCase):
         self.assertEqual(result["type"], "create_entry")
         self.assertEqual(result["data"], {"station_id": "11816"})
 
+    def test_live_station_options_include_only_same_parent_live_children(self):
+        module = _load_config_flow()
+        flow = module.SHMUSubentryFlow()
+        flow._get_entry = Mock(
+            return_value=types.SimpleNamespace(
+                subentries={
+                    "live": types.SimpleNamespace(
+                        subentry_id="live",
+                        subentry_type="live_station",
+                        title="Pezinok - Grinava",
+                    ),
+                    "forecast": types.SimpleNamespace(
+                        subentry_id="forecast",
+                        subentry_type="meteogram",
+                        title="Pezinok — ALADIN",
+                    ),
+                }
+            )
+        )
+
+        self.assertEqual(
+            flow._live_station_options(),
+            [{"value": "live", "label": "Pezinok - Grinava"}],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -101,6 +101,14 @@ class SHMUSubentryFlow(config_entries.ConfigSubentryFlow):
     def _find(self, values: list[LocationOption], value: str) -> LocationOption | None:
         return next((item for item in values if item.value == value), None)
 
+    def _live_station_options(self) -> list[SelectOptionDict]:
+        """Return live-station children available for forecast association."""
+        return [
+            SelectOptionDict(value=subentry.subentry_id, label=subentry.title)
+            for subentry in self._get_entry().subentries.values()
+            if subentry.subentry_type == SUBENTRY_LIVE_STATION
+        ]
+
     def _duplicate(self, unique_id: str) -> bool:
         return any(
             subentry.unique_id == unique_id
