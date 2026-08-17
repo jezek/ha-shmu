@@ -21,6 +21,7 @@ class RuntimeSource:
     model: str | None
     preserve_legacy_ids: bool = False
     display_name: str = ""
+    live_station_subentry_id: str = ""
 
 
 def runtime_sources(subentries: Iterable[Any]) -> list[RuntimeSource]:
@@ -57,6 +58,9 @@ def runtime_sources(subentries: Iterable[Any]) -> list[RuntimeSource]:
                 model=model,
                 preserve_legacy_ids=bool(data.get("preserve_legacy_ids")),
                 display_name=str(data.get("area_name") or area_id),
+                live_station_subentry_id=str(
+                    data.get("live_station_subentry_id") or ""
+                ).strip(),
             )
         )
     return result

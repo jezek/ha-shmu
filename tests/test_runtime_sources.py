@@ -45,7 +45,12 @@ class TestRuntimeSources(unittest.TestCase):
                 _Subentry(
                     "z",
                     "meteogram",
-                    {"model": "ecmwf", "area_id": "31396", "area_name": "Pezinok"},
+                    {
+                        "model": "ecmwf",
+                        "area_id": "31396",
+                        "area_name": "Pezinok",
+                        "live_station_subentry_id": "a",
+                    },
                 ),
                 _Subentry(
                     "a",
@@ -62,6 +67,10 @@ class TestRuntimeSources(unittest.TestCase):
         self.assertEqual(
             [source.display_name for source in sources],
             ["Pezinok - Grinava", "32737", "Pezinok"],
+        )
+        self.assertEqual(
+            [source.live_station_subentry_id for source in sources],
+            ["", "", "a"],
         )
 
     def test_invalid_or_unknown_children_are_ignored(self):
