@@ -110,7 +110,10 @@ def ecmwf_meteogram_device_info(coordinator) -> DeviceInfo:
         name=f"SHMU ECMWF {area_name}",
         manufacturer="Slovenský hydrometeorologický ústav",
         model="ECMWF 10-day Forecast",
-        configuration_url="https://www.shmu.sk/data/datanwp/json/ecmwf/",
+        configuration_url=(
+            "https://www.shmu.sk/sk/"
+            f"?page=2673&nwp_mesto={meteogram_id}#ecmwf"
+        ),
         sw_version="1.0",
     )
     if source is None or source.preserve_legacy_ids:

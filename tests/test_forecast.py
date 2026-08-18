@@ -402,6 +402,40 @@ class TestForecastHelperContract(unittest.TestCase):
         self.assertEqual(daily[0]["templow"], 12.0)
         self.assertEqual(daily[0]["temperature"], 33.0)
 
+    def test_rows_as_daily_forecast_accepts_sparse_cest_days_without_midnight_rows(self):
+        bratislava = ZoneInfo("Europe/Bratislava")
+        start = datetime(2026, 8, 18, 0, tzinfo=timezone.utc)
+        rows = forecast.parse_helper_forecast(
+            {
+                "model_run_time": start.isoformat().replace("+00:00", "Z"),
+                "source_url": "https://example.test/meteogram.json",
+                "source_run_id": "meteogram-run",
+                # Local CEST times are 02:00, 05:00, ...; no local midnight.
+                "rows": [
+                    {
+                        "valid_time": (start + timedelta(hours=offset))
+                        .isoformat()
+                        .replace("+00:00", "Z"),
+                        "temperature": float(offset),
+                    }
+                    for offset in range(0, 75, 3)
+                ],
+            }
+        )
+
+        daily = forecast.rows_as_daily_forecast(
+            rows,
+            require_hourly_coverage=False,
+            time_zone=bratislava,
+        )
+
+        self.assertEqual(
+            [item["datetime"] for item in daily],
+            ["2026-08-19T10:00:00Z", "2026-08-20T10:00:00Z"],
+        )
+        self.assertEqual(daily[0]["templow"], 24.0)
+        self.assertEqual(daily[0]["temperature"], 45.0)
+
     def test_current_condition_prefers_observed_rain(self):
         reference = datetime(2026, 7, 25, 2, 30, tzinfo=timezone.utc)
         rows = self._condition_rows(reference)

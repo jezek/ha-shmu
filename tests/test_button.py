@@ -91,8 +91,9 @@ class _Coordinator:
         self.forecast_force_refresh = force_refresh
         return self._forecast_result
 
-    async def _async_refresh_ecmwf_meteogram_cache(self):
+    async def _async_refresh_ecmwf_meteogram_cache(self, *, force_refresh=False):
         self.ecmwf_calls += 1
+        self.ecmwf_force_refresh = force_refresh
         return self._ecmwf_result
 
     def async_update_listeners(self):
@@ -177,6 +178,7 @@ class TestRefreshButtons(unittest.IsolatedAsyncioTestCase):
             {("shmu", "entry-123_ecmwf_meteogram")},
         )
         self.assertEqual(coordinator.ecmwf_calls, 1)
+        self.assertTrue(coordinator.ecmwf_force_refresh)
         self.assertEqual(coordinator.listener_updates, 1)
 
     async def test_refresh_button_raises_when_refresh_fails(self):

@@ -227,6 +227,7 @@ def update_forecast_cache_latest_ecmwf_meteogram(
     station_id: str,
     timeout: int = 30,
     opener=None,
+    force_refresh: bool = False,
 ) -> dict[str, Any]:
     """Update the cache from the latest interactive ECMWF 10-day meteogram product."""
     station_products_url = SHMU_ECMWF_STATION_PRODUCTS_URL.format(station_id=station_id)
@@ -241,6 +242,7 @@ def update_forecast_cache_latest_ecmwf_meteogram(
     return update_forecast_cache_payload(
         cache_path,
         ecmwf_meteogram_helper_payload(meteogram_payload, source_url),
+        replace_same_run=force_refresh,
     )
 
 

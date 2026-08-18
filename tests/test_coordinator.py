@@ -451,11 +451,12 @@ class TestCoordinatorForecastLifecycle(unittest.IsolatedAsyncioTestCase):
 
         await coordinator._async_refresh_forecast_history()
 
-        self.assertEqual(len(coordinator.forecast_historical_temperatures), 12)
+        self.assertEqual(len(coordinator.forecast_historical_temperatures), 23)
         self.assertEqual(
             coordinator.forecast_history_info["source"],
             "aladin_leading_day_fallback",
         )
+        self.assertEqual(coordinator.forecast_history_info["synthetic_hour_count"], 11)
 
     async def test_history_gap_does_not_use_aladin_fallback_for_helper_source(self):
         coordinator_module = _load_coordinator_module()
@@ -480,6 +481,32 @@ class TestCoordinatorForecastLifecycle(unittest.IsolatedAsyncioTestCase):
 
         coordinator._hass.async_add_executor_job.assert_not_awaited()
         self.assertEqual(coordinator.forecast_historical_temperatures, {})
+
+    def test_synthetic_leading_hours_ignore_temperatures_from_other_days(self):
+        coordinator_module = _load_coordinator_module()
+        coordinator = object.__new__(coordinator_module.SHMUDataUpdateCoordinator)
+        dt = __import__("datetime")
+        first = dt.datetime(2026, 8, 5, 12, tzinfo=dt.timezone.utc)
+        coordinator.forecast_rows = [
+            types.SimpleNamespace(valid_time=first, temperature=18.0)
+        ]
+        coordinator.forecast_historical_temperatures = {
+            first.replace(hour=11): 20.0,
+            first - dt.timedelta(days=1): -10.0,
+        }
+        coordinator.forecast_history_info = {}
+        coordinator._hass = types.SimpleNamespace(
+            config=types.SimpleNamespace(time_zone="UTC")
+        )
+
+        coordinator._synthesize_missing_leading_forecast_hours(first)
+
+        synthetic = [
+            temperature
+            for timestamp, temperature in coordinator.forecast_historical_temperatures.items()
+            if timestamp.date() == first.date() and timestamp.hour not in {11, 12}
+        ]
+        self.assertEqual(synthetic, [18.0] * 22)
 
 
 if __name__ == "__main__":

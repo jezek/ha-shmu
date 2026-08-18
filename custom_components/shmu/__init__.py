@@ -7,6 +7,7 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 import logging
 from types import MappingProxyType
 from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 from .cache_paths import (
     ecmwf_meteogram_cache_path_for_entry,
     forecast_cache_path_for_subentry,
@@ -221,7 +222,7 @@ class SHMUDataUpdateCoordinator(DataUpdateCoordinator):
             return
         first_valid_time = min(row.valid_time for row in self.forecast_rows)
         now = datetime.now(timezone.utc)
-        if first_valid_time > now or first_valid_time.hour == 0:
+        if first_valid_time > now:
             return
         day_start = first_valid_time.replace(hour=0, minute=0, second=0, microsecond=0)
         if self._api is not None:
@@ -238,7 +239,6 @@ class SHMUDataUpdateCoordinator(DataUpdateCoordinator):
                     "source": "observed_station_history",
                     "hour_count": len(self.forecast_historical_temperatures),
                 }
-                return
             except Exception as err:
                 _LOGGER.warning("Unable to complete leading SHMU forecast day: %s", err)
 
@@ -256,8 +256,8 @@ class SHMUDataUpdateCoordinator(DataUpdateCoordinator):
                     longitude=self._hass.config.longitude,
                     verify_ssl=self._verify_ssl,
                 )
-            )
-            self.forecast_historical_temperatures = result["temperatures"]
+                )
+            self.forecast_historical_temperatures.update(result["temperatures"])
             self.forecast_history_info = result["info"]
             _LOGGER.debug(
                 "Completed leading SHMU forecast day from %s",
@@ -267,14 +267,83 @@ class SHMUDataUpdateCoordinator(DataUpdateCoordinator):
             _LOGGER.warning(
                 "Unable to use ALADIN leading-day fallback: %s", fallback_err
             )
+        self._synthesize_missing_leading_forecast_hours(first_valid_time)
 
-    async def _async_refresh_ecmwf_meteogram_cache(self, station_id: str | None = None):
+    def _synthesize_missing_leading_forecast_hours(
+        self, first_valid_time: datetime
+    ) -> None:
+        """Keep the leading local daily card usable after source fallbacks.
+
+        A run can begin after local midnight and a preceding published run can
+        still lack one or two boundary hours.  Fill only those remaining
+        hours with an already observed/forecast temperature, so the genuine
+        daily minimum and maximum cannot change.  This is deliberately a
+        last resort and is always visible in the log.
+        """
+        local_zone = ZoneInfo(getattr(self._hass.config, "time_zone", "UTC"))
+        local_first = first_valid_time.astimezone(local_zone)
+        day_start = local_first.replace(hour=0, minute=0, second=0, microsecond=0)
+        day_rows = [
+            row
+            for row in self.forecast_rows
+            if row.valid_time.astimezone(local_zone).date() == day_start.date()
+        ]
+        covered_hours = {
+            row.valid_time.astimezone(local_zone).hour for row in day_rows
+        } | {
+            timestamp.astimezone(local_zone).hour
+            for timestamp in self.forecast_historical_temperatures
+            if timestamp.astimezone(local_zone).date() == day_start.date()
+        }
+        missing_hours = set(range(24)) - covered_hours
+        if not missing_hours:
+            return
+        temperatures = [
+            row.temperature
+            for row in day_rows
+            if getattr(row, "temperature", None) is not None
+        ]
+        temperatures.extend(
+            temperature
+            for timestamp, temperature in self.forecast_historical_temperatures.items()
+            if timestamp.astimezone(local_zone).date() == day_start.date()
+        )
+        if not temperatures:
+            _LOGGER.warning(
+                "ALADIN leading local forecast day remains incomplete; no temperature "
+                "is available for synthetic boundary hours"
+            )
+            return
+        synthetic_temperature = min(temperatures)
+        for hour in missing_hours:
+            synthetic_time = (day_start + timedelta(hours=hour)).astimezone(
+                timezone.utc
+            )
+            self.forecast_historical_temperatures[synthetic_time] = (
+                synthetic_temperature
+            )
+        self.forecast_history_info = {
+            **self.forecast_history_info,
+            "synthetic_hour_count": len(missing_hours),
+            "synthetic_temperature": synthetic_temperature,
+        }
+        _LOGGER.warning(
+            "ALADIN leading local forecast day lacked %d boundary hour(s) after "
+            "preceding-run fallback; synthesized them without changing known "
+            "temperature min/max",
+            len(missing_hours),
+        )
+
+    async def _async_refresh_ecmwf_meteogram_cache(
+        self, station_id: str | None = None, *, force_refresh: bool = False
+    ):
         """Refresh the separate ECMWF 10-day meteogram cache on explicit request."""
         selected_station_id = station_id or self._default_meteogram_station_id()
         cache_path = self._forecast_cache_path(MODEL_ECMWF)
         update_job = ecmwf_meteogram_cache_update_job(
             cache_path,
             station_id=selected_station_id,
+            force_refresh=force_refresh,
         )
 
         try:

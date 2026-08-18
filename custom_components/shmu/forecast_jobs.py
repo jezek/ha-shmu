@@ -66,10 +66,12 @@ def ecmwf_meteogram_cache_update_job(
     cache_path: str | Path,
     *,
     station_id: str,
+    force_refresh: bool = False,
 ) -> Callable[[], dict[str, Any]]:
     """Return the executor job for a latest ECMWF 10-day meteogram refresh."""
     return partial(
         update_forecast_cache_latest_ecmwf_meteogram,
         cache_path,
         station_id=station_id,
+        force_refresh=force_refresh,
     )

@@ -611,6 +611,36 @@ class TestForecastUpdate(unittest.TestCase):
         self.assertEqual(written["rows"][0]["cloud_cover"], 47.745)
         self.assertEqual([timeout for _, timeout in calls], [5, 5])
 
+    def test_ecmwf_manual_refresh_rewrites_an_unchanged_run(self):
+        forecast_update = _load_forecast_update()
+
+        def opener(request, timeout):
+            if request.full_url.endswith("getstationproducts?station=31396"):
+                return _json_response(
+                    {"data": [{"type": "ecmwf", "runtime": 1783296000,
+                               "file_link": "ecmwf/2026-07-06/31396_2026-07-06_00.json"}]}
+                )
+            return _json_response(
+                {
+                    "data_date_time": "2026-07-06T00:00Z", "si_id": "31396",
+                    "Air_temperature_at_2m": {
+                        "columns": ["Time", "Median"],
+                        "data": [[1783296000, 17.592]],
+                    },
+                }
+            )
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            cache_path = Path(temp_dir) / "forecast-cache.json"
+            forecast_update.update_forecast_cache_latest_ecmwf_meteogram(
+                cache_path, station_id="31396", opener=opener
+            )
+            result = forecast_update.update_forecast_cache_latest_ecmwf_meteogram(
+                cache_path, station_id="31396", opener=opener, force_refresh=True
+            )
+
+        self.assertTrue(result["changed"])
+
 
 if __name__ == "__main__":
     unittest.main()

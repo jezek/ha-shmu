@@ -111,7 +111,20 @@ class TestForecastJobs(unittest.TestCase):
             job.args,
             ("/config/shmu/ecmwf-meteogram-cache-entry-123.json",),
         )
-        self.assertEqual(job.keywords, {"station_id": "31396"})
+        self.assertEqual(
+            job.keywords, {"station_id": "31396", "force_refresh": False}
+        )
+
+    def test_ecmwf_meteogram_cache_update_job_threads_manual_force_refresh(self):
+        forecast_jobs = _load_module("forecast_jobs")
+
+        job = forecast_jobs.ecmwf_meteogram_cache_update_job(
+            "/config/shmu/ecmwf-meteogram-cache-entry-123.json",
+            station_id="31396",
+            force_refresh=True,
+        )
+
+        self.assertTrue(job.keywords["force_refresh"])
 
 
 if __name__ == "__main__":

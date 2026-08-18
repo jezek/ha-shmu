@@ -58,7 +58,9 @@ class SHMUECMWFMeteogramRefreshButton(CoordinatorEntity, ButtonEntity):
 
     async def async_press(self) -> None:
         """Refresh the ECMWF 10-day meteogram cache."""
-        result = await self.coordinator._async_refresh_ecmwf_meteogram_cache()
+        result = await self.coordinator._async_refresh_ecmwf_meteogram_cache(
+            force_refresh=True
+        )
         self.coordinator.async_update_listeners()
         if result is None:
             raise HomeAssistantError("SHMU ECMWF 10-day meteogram cache refresh failed")

@@ -109,6 +109,10 @@ class TestEntityHelpers(unittest.TestCase):
         self.assertEqual(forecast_info["model"], "ALADIN 3-day Forecast")
         self.assertEqual(ecmwf_info["name"], "SHMU ECMWF Pezinok")
         self.assertEqual(ecmwf_info["model"], "ECMWF 10-day Forecast")
+        self.assertEqual(
+            ecmwf_info["configuration_url"],
+            "https://www.shmu.sk/sk/?page=2673&nwp_mesto=31396#ecmwf",
+        )
         self.assertNotIn("via_device", forecast_info)
 
     def test_new_live_aladin_and_ecmwf_children_use_three_devices(self):
@@ -244,7 +248,7 @@ class TestEntityHelpers(unittest.TestCase):
         self.assertEqual(ecmwf_info["model"], "ECMWF 10-day Forecast")
         self.assertEqual(
             ecmwf_info["configuration_url"],
-            "https://www.shmu.sk/data/datanwp/json/ecmwf/",
+            "https://www.shmu.sk/sk/?page=2673&nwp_mesto=32737#ecmwf",
         )
 
 

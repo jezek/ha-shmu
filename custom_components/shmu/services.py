@@ -129,7 +129,9 @@ async def async_setup_services(hass: HomeAssistant) -> None:
     async def refresh_ecmwf_meteogram_cache(call: ServiceCall) -> dict[str, Any]:
         entry_data = _entry_data_for_call(hass, call)
         coordinator = _coordinator_for_call(entry_data, call, MODEL_ECMWF)
-        result = await coordinator._async_refresh_ecmwf_meteogram_cache()
+        result = await coordinator._async_refresh_ecmwf_meteogram_cache(
+            force_refresh=True
+        )
         coordinator.async_update_listeners()
         if result is None:
             raise HomeAssistantError("SHMU ECMWF 10-day meteogram cache refresh failed")

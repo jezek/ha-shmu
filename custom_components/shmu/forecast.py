@@ -252,12 +252,6 @@ def rows_as_daily_forecast(
         days.setdefault(day_key, []).append(row)
 
     forecasts: list[dict[str, Any]] = []
-    row_times = {
-        row.valid_time.astimezone(presentation_time_zone).replace(
-            minute=0, second=0, microsecond=0
-        )
-        for row in rows
-    }
     initial_day = min(days, default=None)
     for day_key, day_rows in days.items():
         historical_day = (
@@ -270,10 +264,25 @@ def rows_as_daily_forecast(
             if covered_hours != set(range(24)):
                 continue
         else:
+            # ECMWF publishes values every three or six hours and its first
+            # local value is not necessarily midnight (for example 02:00 in
+            # CEST).  A calendar day is nevertheless complete when samples
+            # bracket both local boundaries.  Requiring samples *at* those
+            # boundaries made every sparse ECMWF daily forecast disappear.
             day_start = datetime.fromisoformat(day_key).replace(
                 tzinfo=presentation_time_zone
             )
-            if day_start not in row_times or day_start + timedelta(days=1) not in row_times:
+            day_end = day_start + timedelta(days=1)
+            if not (
+                any(
+                    row.valid_time.astimezone(presentation_time_zone) <= day_start
+                    for row in rows
+                )
+                and any(
+                    row.valid_time.astimezone(presentation_time_zone) >= day_end
+                    for row in rows
+                )
+            ):
                 continue
         temperatures = [row.temperature for row in day_rows if row.temperature is not None]
         temperatures.extend(
