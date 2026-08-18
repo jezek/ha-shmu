@@ -32,7 +32,8 @@
         }
       },
       "abort": {
-        "cannot_connect": "Nepodarilo sa načítať oficiálny katalóg SHMÚ."
+        "cannot_connect": "Nepodarilo sa načítať oficiálny katalóg SHMÚ.",
+        "reconfigure_successful": "Priradenie stanice k predpovedi bolo aktualizované."
       },
       "error": {
         "invalid_item": "Vybraná stanica nie je v aktuálnom oficiálnom katalógu.",

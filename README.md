@@ -27,6 +27,13 @@ Each **live station** child selects one official observation station. Each
 forecast area. The complete catalogues are searchable in Home Assistant and
 submitted IDs are validated again against current SHMU data.
 
+A meteogram may optionally be associated with one live-station child from the
+same location, both while it is created and later through its edit action.
+When assigned, the forecast weather entity uses that station for current
+temperature, pressure, humidity, wind, visibility and observed precipitation.
+Without an assignment, those current-observation attributes stay empty and
+the forecast remains model-only.
+
 One location can contain several live stations and meteograms, including both
 models for the same area. Exact duplicate station or model/area children are
 rejected. `Verify SSL` is configured once on the location and inherited by all
@@ -95,7 +102,8 @@ age, model run time, and valid forecast range.
 ## Troubleshooting
 
 - Open the location's subentries and verify the selected station, model and
-  forecast area.
+  forecast area. Edit a meteogram child to change or clear its optional live
+  station association.
 - Check the logs for errors if sensors are unavailable.
 - For some stations, data or some attributes are not available.
 - Sometimes there may be a delay in the publication of data or a longer period with no data published.

@@ -160,6 +160,9 @@ class TestMeteogramAssociation(unittest.IsolatedAsyncioTestCase):
         flow._areas = [types.SimpleNamespace(value="pezinok", label="Pezinok")]
         flow._stations = [types.SimpleNamespace(value="11816", label="Pezinok")]
         flow._duplicate = Mock(return_value=False)
+        flow._live_station_options = Mock(
+            return_value=[{"value": "live-child-id", "label": "Pezinok"}]
+        )
         flow._create_source_entry = Mock(return_value={"type": "create_entry"})
 
         await flow.async_step_meteogram_area(
@@ -173,6 +176,31 @@ class TestMeteogramAssociation(unittest.IsolatedAsyncioTestCase):
             flow._create_source_entry.call_args.kwargs["data"]
             ["live_station_subentry_id"],
             "live-child-id",
+        )
+
+    async def test_reconfigure_updates_association_and_reloads_parent(self):
+        module = _load_config_flow()
+        flow = module.SHMUSubentryFlow()
+        entry = types.SimpleNamespace(entry_id="parent")
+        subentry = types.SimpleNamespace(
+            subentry_type="meteogram",
+            data={"live_station_subentry_id": "old-live"},
+        )
+        flow._get_entry = Mock(return_value=entry)
+        flow._get_reconfigure_subentry = Mock(return_value=subentry)
+        flow._live_station_options = Mock(
+            return_value=[{"value": "new-live", "label": "Pezinok"}]
+        )
+        flow.async_update_reload_and_abort = Mock(return_value={"type": "abort"})
+
+        await flow.async_step_reconfigure(
+            {"live_station_subentry_id": "new-live"}
+        )
+
+        flow.async_update_reload_and_abort.assert_called_once_with(
+            entry,
+            subentry,
+            data_updates={"live_station_subentry_id": "new-live"},
         )
 
 

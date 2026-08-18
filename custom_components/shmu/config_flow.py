@@ -191,7 +191,13 @@ class SHMUSubentryFlow(config_entries.ConfigSubentryFlow):
         errors = {}
         if user_input is not None:
             area = self._find(self._areas, user_input["area_id"])
-            if area is None:
+            station_id = user_input.get("live_station_subentry_id", "")
+            valid_station_ids = {
+                option["value"] for option in self._live_station_options()
+            }
+            if station_id and station_id not in valid_station_ids:
+                errors["base"] = "invalid_station"
+            elif area is None:
                 errors["base"] = "invalid_item"
             else:
                 unique_id = f"{SUBENTRY_METEOGRAM}:{self._model}:{area.value}"
@@ -205,9 +211,7 @@ class SHMUSubentryFlow(config_entries.ConfigSubentryFlow):
                             "model": self._model,
                             "area_id": area.value,
                             "area_name": area.label,
-                            "live_station_subentry_id": user_input.get(
-                                "live_station_subentry_id", ""
-                            ),
+                            "live_station_subentry_id": station_id,
                         },
                     )
         return self.async_show_form(
