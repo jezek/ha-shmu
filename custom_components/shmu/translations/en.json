@@ -32,8 +32,7 @@
         }
       },
       "abort": {
-        "cannot_connect": "Unable to load the official SHMU catalogue.",
-        "reconfigure_successful": "Forecast station association updated."
+        "cannot_connect": "Unable to load the official SHMU catalogue."
       },
       "error": {
         "invalid_item": "The selected station is not in the current official catalogue.",
@@ -67,7 +66,8 @@
         }
       },
       "abort": {
-        "cannot_connect": "Unable to load the official SHMU catalogue."
+        "cannot_connect": "Unable to load the official SHMU catalogue.",
+        "reconfigure_successful": "Forecast station association updated."
       },
       "error": {
         "invalid_item": "The selected area is not in the current official catalogue.",
