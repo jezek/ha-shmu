@@ -44,6 +44,11 @@ The normal refresh interval is 300 seconds. Existing entries that contain an
 older custom `scan_interval` continue to use it, but new entries no longer
 expose this implementation detail in the form.
 
+Live observations continue to come exclusively from the official SHMU
+OpenData JSON directory. The optional station association only supplies those
+observations to a forecast entity; it does not add an HTML-page fallback or
+change the live-station fetch source.
+
 ## Sensors
 
 Each live-station child creates an independent observation device with:
