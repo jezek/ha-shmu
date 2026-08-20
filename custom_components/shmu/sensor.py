@@ -164,12 +164,17 @@ class SHMUForecastSummarySensor(CoordinatorEntity, SensorEntity):
         super().__init__(coordinator)
         self._summary_key = summary_key
         self._attr_name = name
-        self._attr_unique_id = entity_unique_id(coordinator, summary_key)
+        source = getattr(coordinator, "source", None)
+        unique_suffix = (
+            f"ecmwf_meteogram_{summary_key}"
+            if source and source.model == MODEL_ECMWF
+            else summary_key
+        )
+        self._attr_unique_id = entity_unique_id(coordinator, unique_suffix)
         self._attr_native_unit_of_measurement = unit
         self._attr_device_class = device_class
         self._attr_icon = icon
 
-        source = getattr(coordinator, "source", None)
         self._attr_device_info = (
             ecmwf_meteogram_device_info(coordinator)
             if source and source.model == MODEL_ECMWF

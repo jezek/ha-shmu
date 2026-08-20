@@ -127,6 +127,7 @@ class TestECMWFSensorParity(unittest.TestCase):
         self.assertEqual(summaries[0].native_value, 7.5)
         self.assertIs(forecast_summary.call_args.args[0], ecmwf_rows)
         self.assertEqual(summaries[0]._attr_device_info["model"], "ecmwf")
+        self.assertIn("ecmwf_meteogram_", summaries[0]._attr_unique_id)
         coordinator._forecast_cache_path.assert_called_once_with("ecmwf")
 
         diagnostics = [
