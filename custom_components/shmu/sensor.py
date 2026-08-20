@@ -302,6 +302,13 @@ class SHMUECMWFMeteogramCacheInfoSensor(CoordinatorEntity, SensorEntity):
             "newest_valid_time",
         } and isinstance(value, str):
             return datetime.fromisoformat(value.replace("Z", "+00:00"))
+        if self._info_key == "age_seconds":
+            downloaded_time = info.get("downloaded_time")
+            if isinstance(downloaded_time, str):
+                downloaded = datetime.fromisoformat(
+                    downloaded_time.replace("Z", "+00:00")
+                )
+                return round(max(0.0, (now() - downloaded).total_seconds()))
         return value
 
 
@@ -570,6 +577,13 @@ def _build_sensors(hass, coordinator):
                 "ECMWF meteogram downloaded time",
                 SensorDeviceClass.TIMESTAMP,
                 icon="mdi:download",
+            ),
+            SHMUECMWFMeteogramCacheInfoSensor(
+                coordinator,
+                "age_seconds",
+                "ECMWF meteogram cache age",
+                state_class=SensorStateClass.MEASUREMENT,
+                icon="mdi:timer-sand",
             ),
             SHMUECMWFMeteogramCacheInfoSensor(
                 coordinator,

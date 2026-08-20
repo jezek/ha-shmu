@@ -1,4 +1,5 @@
 import importlib.util
+from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
 import sys
@@ -43,7 +44,7 @@ def _load_sensor():
     const.PERCENTAGE = "%"
     entity.EntityCategory = EntityCategory
     update.CoordinatorEntity = CoordinatorEntity
-    util_dt.now = Mock()
+    util_dt.now = Mock(return_value=datetime(2026, 8, 20, 10, 2, tzinfo=timezone.utc))
 
     modules = {
         "homeassistant": types.ModuleType("homeassistant"),
@@ -68,7 +69,7 @@ def _load_sensor():
     forecast_summary = Mock(return_value={"tomorrow_min_temperature": 7.5})
     dependencies = {
         "cache_paths": {"forecast_cache_path_for_entry": Mock()},
-        "const": {"DOMAIN": "shmu"},
+        "const": {"DEFAULT_STATION_ID": "11813", "DOMAIN": "shmu"},
         "entity_helpers": {
             "aladin_meteogram_page_url": Mock(),
             "ecmwf_meteogram_device_info": Mock(return_value={"model": "ecmwf"}),
@@ -108,7 +109,7 @@ class TestECMWFSensorParity(unittest.TestCase):
             data={},
             forecast_rows=["aladin-row"],
             ecmwf_forecast_rows=ecmwf_rows,
-            ecmwf_cache_info={},
+            ecmwf_cache_info={"downloaded_time": "2026-08-20T09:00:00Z"},
             _forecast_cache_path=Mock(return_value="/ecmwf.json"),
         )
 
@@ -124,6 +125,15 @@ class TestECMWFSensorParity(unittest.TestCase):
         self.assertIs(forecast_summary.call_args.args[0], ecmwf_rows)
         self.assertEqual(summaries[0]._attr_device_info["model"], "ecmwf")
         coordinator._forecast_cache_path.assert_called_once_with("ecmwf")
+
+        diagnostics = [
+            entity
+            for entity in entities
+            if isinstance(entity, sensor.SHMUECMWFMeteogramCacheInfoSensor)
+        ]
+        age = next(entity for entity in diagnostics if entity._info_key == "age_seconds")
+        self.assertEqual(len(diagnostics), 8)
+        self.assertEqual(age.native_value, 3720)
 
 
 if __name__ == "__main__":
