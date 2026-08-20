@@ -336,6 +336,42 @@ def rows_as_daily_forecast(
     return forecasts
 
 
+def sparse_daily_completion_info(
+    rows: list[ForecastRow], time_zone: tzinfo
+) -> list[dict[str, Any]]:
+    """Describe sparse local days accepted using samples around their boundaries.
+
+    ECMWF values are commonly three hours apart, so a complete local day may
+    have no sample exactly at either local midnight.  Keep this calculation
+    separate from aggregation so the coordinator can log the approximation
+    once per cache refresh and expose its provenance diagnostically.
+    """
+    local_times = sorted(row.valid_time.astimezone(time_zone) for row in rows)
+    day_keys = sorted({value.date().isoformat() for value in local_times})
+    result = []
+    for day_key in day_keys:
+        day_start = datetime.fromisoformat(day_key).replace(tzinfo=time_zone)
+        day_end = day_start + timedelta(days=1)
+        if not (
+            any(value <= day_start for value in local_times)
+            and any(value >= day_end for value in local_times)
+        ):
+            continue
+        missing_boundaries = [
+            label
+            for label, boundary in (("start", day_start), ("end", day_end))
+            if boundary not in local_times
+        ]
+        if missing_boundaries:
+            result.append(
+                {
+                    "date": day_key,
+                    "missing_boundaries": missing_boundaries,
+                }
+            )
+    return result
+
+
 def forecast_summary(rows: list[ForecastRow], now: datetime) -> dict[str, Any]:
     """Return compact forecast summary values for practical sensors."""
     now_utc = _as_aware_utc(now)

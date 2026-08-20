@@ -436,6 +436,20 @@ class TestForecastHelperContract(unittest.TestCase):
         self.assertEqual(daily[0]["templow"], 24.0)
         self.assertEqual(daily[0]["temperature"], 45.0)
 
+        self.assertEqual(
+            forecast.sparse_daily_completion_info(rows, bratislava),
+            [
+                {
+                    "date": "2026-08-19",
+                    "missing_boundaries": ["start", "end"],
+                },
+                {
+                    "date": "2026-08-20",
+                    "missing_boundaries": ["start", "end"],
+                },
+            ],
+        )
+
     def test_current_condition_prefers_observed_rain(self):
         reference = datetime(2026, 7, 25, 2, 30, tzinfo=timezone.utc)
         rows = self._condition_rows(reference)
