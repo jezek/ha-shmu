@@ -234,6 +234,7 @@ class SHMUECMWFMeteogramWeather(CoordinatorEntity, WeatherEntity):
         rows = await self.hass.async_add_executor_job(self._load_rows)
         return rows_as_daily_forecast(
             rows,
+            reference_time=datetime.now(timezone.utc),
             require_hourly_coverage=False,
             time_zone=ZoneInfo(self.hass.config.time_zone),
         )

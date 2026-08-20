@@ -564,7 +564,7 @@ class TestForecastHelperContract(unittest.TestCase):
 
         self.assertEqual(daily, [])
 
-    def test_rows_as_daily_forecast_completes_initial_past_day_with_history(self):
+    def test_rows_as_daily_forecast_excludes_initial_past_day_with_history(self):
         day = datetime(2026, 7, 25, tzinfo=timezone.utc)
         rows = forecast.parse_helper_forecast(
             {
@@ -588,9 +588,36 @@ class TestForecastHelperContract(unittest.TestCase):
             day + timedelta(days=1, hours=12),
         )
 
-        self.assertEqual(daily[0]["datetime"], "2026-07-25T12:00:00Z")
-        self.assertEqual(daily[0]["templow"], 5.0)
-        self.assertEqual(daily[0]["temperature"], 43.0)
+        self.assertEqual(daily, [])
+
+    def test_rows_as_daily_forecast_excludes_previous_local_day(self):
+        bratislava = ZoneInfo("Europe/Bratislava")
+        start = datetime(2026, 8, 18, 22, tzinfo=timezone.utc)
+        rows = forecast.parse_helper_forecast(
+            {
+                "model_run_time": start.isoformat(),
+                "source_url": "https://example.test/aladin.json",
+                "source_run_id": "run",
+                "rows": [
+                    {
+                        "valid_time": (start + timedelta(hours=hour)).isoformat(),
+                        "temperature": 10 + hour,
+                    }
+                    for hour in range(73)
+                ],
+            }
+        )
+
+        daily = forecast.rows_as_daily_forecast(
+            rows,
+            reference_time=datetime(2026, 8, 20, 12, tzinfo=timezone.utc),
+            time_zone=bratislava,
+        )
+
+        self.assertEqual(
+            [item["datetime"] for item in daily],
+            ["2026-08-20T10:00:00Z", "2026-08-21T10:00:00Z"],
+        )
 
     def test_rows_as_daily_forecast_excludes_incomplete_trailing_half_day(self):
         rows = forecast.parse_helper_forecast(

@@ -253,7 +253,14 @@ def rows_as_daily_forecast(
 
     forecasts: list[dict[str, Any]] = []
     initial_day = min(days, default=None)
+    reference_day = (
+        _as_aware_utc(reference_time).astimezone(presentation_time_zone).date()
+        if reference_time is not None
+        else None
+    )
     for day_key, day_rows in days.items():
+        if reference_day is not None and datetime.fromisoformat(day_key).date() < reference_day:
+            continue
         historical_day = (
             historical_by_day.get(day_key, {}) if day_key == initial_day else {}
         )
