@@ -619,6 +619,13 @@ def _build_sensors(hass, coordinator):
                 "ECMWF meteogram source run",
                 icon="mdi:identifier",
             ),
+            SHMUECMWFMeteogramCacheInfoSensor(
+                coordinator,
+                "synthetic_daily_completion_count",
+                "ECMWF synthetic daily completions",
+                state_class=SensorStateClass.MEASUREMENT,
+                icon="mdi:calendar-sync",
+            ),
         ]
     )
 

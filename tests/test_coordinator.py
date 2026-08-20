@@ -95,7 +95,19 @@ def _load_coordinator_module():
         },
         "const": {"CONF_FORECAST_SOURCE": "forecast_source", "DOMAIN": "shmu"},
         "api": {"SHMUAPI": type("SHMUAPI", (), {})},
-        "forecast": {"ForecastCache": type("ForecastCache", (), {})},
+        "forecast": {
+            "ForecastCache": Mock(
+                return_value=types.SimpleNamespace(load=Mock())
+            ),
+            "sparse_daily_completion_info": Mock(
+                return_value=[
+                    {
+                        "date": "2026-08-19",
+                        "missing_boundaries": ["start", "end"],
+                    }
+                ]
+            ),
+        },
         "forecast_jobs": {
             "ecmwf_meteogram_cache_update_job": Mock(),
             "forecast_cache_update_job": Mock(),
@@ -427,6 +439,39 @@ class TestCoordinatorForecastLifecycle(unittest.IsolatedAsyncioTestCase):
         coordinator._async_refresh_forecast_cache.assert_awaited_once_with()
         coordinator._async_refresh_ecmwf_meteogram_cache.assert_awaited_once_with()
         coordinator.async_update_listeners.assert_called_once_with()
+
+    async def test_ecmwf_refresh_records_and_warns_about_sparse_daily_completion(self):
+        coordinator_module = _load_coordinator_module()
+        coordinator = object.__new__(coordinator_module.SHMUDataUpdateCoordinator)
+        dt = __import__("datetime")
+        base = dt.datetime(2026, 8, 19, tzinfo=dt.timezone.utc)
+        rows = [
+            types.SimpleNamespace(
+                valid_time=base + dt.timedelta(hours=hour)
+            )
+            for hour in range(0, 49, 3)
+        ]
+        coordinator._hass = types.SimpleNamespace(
+            config=types.SimpleNamespace(time_zone="Europe/Bratislava"),
+            async_add_executor_job=AsyncMock(
+                side_effect=[
+                    {"changed": True, "info": {"row_count": len(rows)}},
+                    rows,
+                ]
+            ),
+        )
+        coordinator._forecast_cache_path = Mock(return_value="/tmp/ecmwf.json")
+        coordinator._default_meteogram_station_id = Mock(return_value="31396")
+
+        with self.assertLogs(coordinator_module._LOGGER, level="WARNING") as logs:
+            result = await coordinator._async_refresh_ecmwf_meteogram_cache()
+
+        self.assertIsNotNone(result)
+        self.assertGreater(
+            coordinator.ecmwf_cache_info["synthetic_daily_completion_count"], 0
+        )
+        self.assertTrue(coordinator.ecmwf_cache_info["synthetic_daily_completion"])
+        self.assertIn("surrounding sparse samples", "\n".join(logs.output))
 
     async def test_history_gap_uses_native_aladin_leading_day_fallback(self):
         coordinator_module = _load_coordinator_module()

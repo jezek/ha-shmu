@@ -17,7 +17,7 @@ from .cache_paths import (
 )
 from .const import CONF_FORECAST_SOURCE, DOMAIN
 from .api import SHMUAPI
-from .forecast import ForecastCache
+from .forecast import ForecastCache, sparse_daily_completion_info
 from .forecast_jobs import (
     ecmwf_meteogram_cache_update_job,
     forecast_cache_update_job,
@@ -351,12 +351,27 @@ class SHMUDataUpdateCoordinator(DataUpdateCoordinator):
             self.ecmwf_forecast_rows = await self._hass.async_add_executor_job(
                 ForecastCache(cache_path).load
             )
-            self.ecmwf_cache_info = result["info"]
+            local_zone = ZoneInfo(getattr(self._hass.config, "time_zone", "UTC"))
+            sparse_completion = sparse_daily_completion_info(
+                self.ecmwf_forecast_rows, local_zone
+            )
+            self.ecmwf_cache_info = {
+                **result["info"],
+                "synthetic_daily_completion_count": len(sparse_completion),
+                "synthetic_daily_completion": sparse_completion,
+            }
         except Exception as err:
             _LOGGER.warning("Unable to refresh SHMU ECMWF 10-day meteogram cache: %s", err)
             return None
 
         if result["changed"]:
+            if sparse_completion:
+                _LOGGER.warning(
+                    "ECMWF daily forecast uses surrounding sparse samples to "
+                    "complete %d local day(s); boundary provenance: %s",
+                    len(sparse_completion),
+                    sparse_completion,
+                )
             _LOGGER.debug("Refreshed SHMU ECMWF 10-day meteogram cache: %s", result["info"])
         return {**result, "station_id": selected_station_id}
 

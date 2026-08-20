@@ -109,7 +109,10 @@ class TestECMWFSensorParity(unittest.TestCase):
             data={},
             forecast_rows=["aladin-row"],
             ecmwf_forecast_rows=ecmwf_rows,
-            ecmwf_cache_info={"downloaded_time": "2026-08-20T09:00:00Z"},
+            ecmwf_cache_info={
+                "downloaded_time": "2026-08-20T09:00:00Z",
+                "synthetic_daily_completion_count": 2,
+            },
             _forecast_cache_path=Mock(return_value="/ecmwf.json"),
         )
 
@@ -132,8 +135,14 @@ class TestECMWFSensorParity(unittest.TestCase):
             if isinstance(entity, sensor.SHMUECMWFMeteogramCacheInfoSensor)
         ]
         age = next(entity for entity in diagnostics if entity._info_key == "age_seconds")
-        self.assertEqual(len(diagnostics), 8)
+        completion = next(
+            entity
+            for entity in diagnostics
+            if entity._info_key == "synthetic_daily_completion_count"
+        )
+        self.assertEqual(len(diagnostics), 9)
         self.assertEqual(age.native_value, 3720)
+        self.assertEqual(completion.native_value, 2)
 
 
 if __name__ == "__main__":
