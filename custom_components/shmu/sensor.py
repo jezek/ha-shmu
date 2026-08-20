@@ -169,12 +169,22 @@ class SHMUForecastSummarySensor(CoordinatorEntity, SensorEntity):
         self._attr_device_class = device_class
         self._attr_icon = icon
 
-        self._attr_device_info = forecast_device_info(coordinator)
+        source = getattr(coordinator, "source", None)
+        self._attr_device_info = (
+            ecmwf_meteogram_device_info(coordinator)
+            if source and source.model == MODEL_ECMWF
+            else forecast_device_info(coordinator)
+        )
 
     @property
     def native_value(self):
         """Return the selected forecast summary value."""
-        rows = self.coordinator.forecast_rows
+        source = getattr(self.coordinator, "source", None)
+        rows = (
+            self.coordinator.ecmwf_forecast_rows
+            if source and source.model == MODEL_ECMWF
+            else self.coordinator.forecast_rows
+        )
         if not rows:
             return None
         return forecast_summary(rows, now()).get(self._summary_key)
@@ -389,8 +399,11 @@ def _build_sensors(hass, coordinator):
     if meteogram_id != "none":
         sensors.append(SHMUMeteogramSensor(coordinator, meteogram_id))
 
+    forecast_model = (
+        MODEL_ECMWF if source and source.model == MODEL_ECMWF else MODEL_ALADIN
+    )
     forecast_cache_path = (
-        coordinator._forecast_cache_path(MODEL_ALADIN)
+        coordinator._forecast_cache_path(forecast_model)
         if source
         else forecast_cache_path_for_entry(hass, coordinator.config_entry)
     )
@@ -617,7 +630,10 @@ def _build_sensors(hass, coordinator):
         return [
             sensor
             for sensor in sensors
-            if isinstance(sensor, SHMUECMWFMeteogramCacheInfoSensor)
+            if isinstance(
+                sensor,
+                (SHMUForecastSummarySensor, SHMUECMWFMeteogramCacheInfoSensor),
+            )
         ]
     return []
 
