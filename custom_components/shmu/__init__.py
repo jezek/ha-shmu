@@ -353,7 +353,9 @@ class SHMUDataUpdateCoordinator(DataUpdateCoordinator):
             )
             local_zone = ZoneInfo(getattr(self._hass.config, "time_zone", "UTC"))
             sparse_completion = sparse_daily_completion_info(
-                self.ecmwf_forecast_rows, local_zone
+                self.ecmwf_forecast_rows,
+                local_zone,
+                datetime.now(timezone.utc),
             )
             self.ecmwf_cache_info = {
                 **result["info"],

@@ -450,6 +450,40 @@ class TestForecastHelperContract(unittest.TestCase):
             ],
         )
 
+    def test_rows_as_daily_forecast_accepts_current_sparse_cest_leading_day(self):
+        bratislava = ZoneInfo("Europe/Bratislava")
+        start = datetime(2026, 8, 20, 0, tzinfo=timezone.utc)
+        rows = forecast.parse_helper_forecast(
+            {
+                "model_run_time": start.isoformat(),
+                "source_url": "https://example.test/ecmwf.json",
+                "source_run_id": "ecmwf-run",
+                "rows": [
+                    {
+                        "valid_time": (start + timedelta(hours=offset)).isoformat(),
+                        "temperature": float(offset),
+                    }
+                    for offset in range(0, 31, 3)
+                ],
+            }
+        )
+        reference = datetime(2026, 8, 20, 18, tzinfo=timezone.utc)
+
+        daily = forecast.rows_as_daily_forecast(
+            rows,
+            reference_time=reference,
+            require_hourly_coverage=False,
+            time_zone=bratislava,
+        )
+
+        self.assertEqual(
+            [item["datetime"] for item in daily], ["2026-08-20T10:00:00Z"]
+        )
+        self.assertEqual(
+            forecast.sparse_daily_completion_info(rows, bratislava, reference),
+            [{"date": "2026-08-20", "missing_boundaries": ["start", "end"]}],
+        )
+
     def test_current_condition_prefers_observed_rain(self):
         reference = datetime(2026, 7, 25, 2, 30, tzinfo=timezone.utc)
         rows = self._condition_rows(reference)

@@ -30,6 +30,7 @@ FORECAST_SERIES_FIELDS = {
 }
 FORECAST_COMPARISON_DECIMALS = 3
 CURRENT_CONDITION_MAX_DISTANCE = timedelta(hours=2)
+SPARSE_FORECAST_MAX_BOUNDARY_GAP = timedelta(hours=6)
 
 
 @dataclass(frozen=True)
@@ -280,15 +281,26 @@ def rows_as_daily_forecast(
                 tzinfo=presentation_time_zone
             )
             day_end = day_start + timedelta(days=1)
+            local_times = [
+                row.valid_time.astimezone(presentation_time_zone) for row in rows
+            ]
+            first_day_sample = min(
+                (value for value in local_times if value.date() == day_start.date()),
+                default=None,
+            )
+            has_start_boundary = any(value <= day_start for value in local_times)
+            if (
+                not has_start_boundary
+                and reference_day == day_start.date()
+                and first_day_sample is not None
+                and first_day_sample - day_start <= SPARSE_FORECAST_MAX_BOUNDARY_GAP
+            ):
+                # A 00 UTC ECMWF run starts at 02:00 during CEST. Admit today's
+                # card when only this short leading boundary is absent; the
+                # coordinator records and warns about that approximation.
+                has_start_boundary = True
             if not (
-                any(
-                    row.valid_time.astimezone(presentation_time_zone) <= day_start
-                    for row in rows
-                )
-                and any(
-                    row.valid_time.astimezone(presentation_time_zone) >= day_end
-                    for row in rows
-                )
+                has_start_boundary and any(value >= day_end for value in local_times)
             ):
                 continue
         temperatures = [row.temperature for row in day_rows if row.temperature is not None]
@@ -344,7 +356,9 @@ def rows_as_daily_forecast(
 
 
 def sparse_daily_completion_info(
-    rows: list[ForecastRow], time_zone: tzinfo
+    rows: list[ForecastRow],
+    time_zone: tzinfo,
+    reference_time: datetime | None = None,
 ) -> list[dict[str, Any]]:
     """Describe sparse local days accepted using samples around their boundaries.
 
@@ -354,15 +368,29 @@ def sparse_daily_completion_info(
     once per cache refresh and expose its provenance diagnostically.
     """
     local_times = sorted(row.valid_time.astimezone(time_zone) for row in rows)
+    reference_day = (
+        _as_aware_utc(reference_time).astimezone(time_zone).date()
+        if reference_time is not None
+        else None
+    )
     day_keys = sorted({value.date().isoformat() for value in local_times})
     result = []
     for day_key in day_keys:
         day_start = datetime.fromisoformat(day_key).replace(tzinfo=time_zone)
         day_end = day_start + timedelta(days=1)
-        if not (
-            any(value <= day_start for value in local_times)
-            and any(value >= day_end for value in local_times)
+        first_day_sample = min(
+            (value for value in local_times if value.date() == day_start.date()),
+            default=None,
+        )
+        has_start_boundary = any(value <= day_start for value in local_times)
+        if (
+            not has_start_boundary
+            and reference_day == day_start.date()
+            and first_day_sample is not None
+            and first_day_sample - day_start <= SPARSE_FORECAST_MAX_BOUNDARY_GAP
         ):
+            has_start_boundary = True
+        if not (has_start_boundary and any(value >= day_end for value in local_times)):
             continue
         missing_boundaries = [
             label
