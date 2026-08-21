@@ -269,7 +269,17 @@ def rows_as_daily_forecast(
             row.valid_time.astimezone(presentation_time_zone).hour for row in day_rows
         } | set(historical_day)
         if require_hourly_coverage:
-            if covered_hours != set(range(24)):
+            missing_hours = set(range(24)) - covered_hours
+            first_covered_hour = min(covered_hours, default=24)
+            has_short_current_leading_gap = (
+                day_key == initial_day
+                and reference_day == datetime.fromisoformat(day_key).date()
+                and missing_hours == set(range(first_covered_hour))
+                and first_covered_hour <= int(
+                    SPARSE_FORECAST_MAX_BOUNDARY_GAP.total_seconds() / 3600
+                )
+            )
+            if missing_hours and not has_short_current_leading_gap:
                 continue
         else:
             # ECMWF publishes values every three or six hours and its first

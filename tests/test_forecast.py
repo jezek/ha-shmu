@@ -576,6 +576,59 @@ class TestForecastHelperContract(unittest.TestCase):
         self.assertEqual(daily[0]["temperature"], 43.0)
         self.assertEqual(daily[0]["precipitation"], 1.0)
 
+    def test_rows_as_daily_forecast_accepts_current_aladin_two_hour_boundary_gap(self):
+        bratislava = ZoneInfo("Europe/Bratislava")
+        start = datetime(2026, 8, 21, 0, tzinfo=timezone.utc)
+        rows = forecast.parse_helper_forecast(
+            {
+                "model_run_time": start.isoformat(),
+                "source_url": "https://example.test/aladin.json",
+                "source_run_id": "2026-08-21-00",
+                # The 00 UTC run begins at 02:00 CEST.  The coordinator may
+                # report synthetic 00:00/01:00 boundary temperatures, but the
+                # daily card must not depend on that transient in-memory map.
+                "rows": [
+                    {
+                        "valid_time": (start + timedelta(hours=hour)).isoformat(),
+                        "temperature": 10 + hour,
+                    }
+                    for hour in range(73)
+                ],
+            }
+        )
+
+        daily = forecast.rows_as_daily_forecast(
+            rows,
+            reference_time=start + timedelta(hours=1),
+            time_zone=bratislava,
+        )
+
+        self.assertEqual(daily[0]["datetime"], "2026-08-21T10:00:00Z")
+        self.assertEqual(daily[0]["templow"], 10.0)
+        self.assertEqual(daily[0]["temperature"], 31.0)
+
+    def test_rows_as_daily_forecast_rejects_nonleading_current_aladin_gap(self):
+        day = datetime(2026, 8, 21, tzinfo=timezone.utc)
+        rows = forecast.parse_helper_forecast(
+            {
+                "model_run_time": day.isoformat(),
+                "source_url": "https://example.test/aladin.json",
+                "source_run_id": "run",
+                "rows": [
+                    {
+                        "valid_time": (day + timedelta(hours=hour)).isoformat(),
+                        "temperature": 10 + hour,
+                    }
+                    for hour in range(24)
+                    if hour != 12
+                ],
+            }
+        )
+
+        daily = forecast.rows_as_daily_forecast(rows, reference_time=day)
+
+        self.assertEqual(daily, [])
+
     def test_rows_as_daily_forecast_rejects_current_day_with_history_gap(self):
         day = datetime(2026, 7, 19, tzinfo=timezone.utc)
         rows = forecast.parse_helper_forecast(
