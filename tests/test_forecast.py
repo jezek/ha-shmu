@@ -629,6 +629,58 @@ class TestForecastHelperContract(unittest.TestCase):
 
         self.assertEqual(daily, [])
 
+    def test_20260820_1800_run_keeps_short_trailing_day_for_daily_card(self):
+        bratislava = ZoneInfo("Europe/Bratislava")
+        run = datetime(2026, 8, 20, 18, tzinfo=timezone.utc)
+        rows = forecast.parse_helper_forecast(
+            {
+                "model_run_time": run.isoformat(),
+                "source_url": "https://opendata.shmu.sk/aladin/20260820/1800",
+                "source_run_id": "aladin-sk-4.5km-20260820-1800",
+                "rows": [
+                    {
+                        "valid_time": (run + timedelta(hours=hour)).isoformat(),
+                        "temperature": 10 + hour / 10,
+                    }
+                    for hour in range(73)
+                ],
+            }
+        )
+
+        daily = forecast.rows_as_daily_forecast(
+            rows,
+            reference_time=datetime(2026, 8, 21, 1, 30, tzinfo=timezone.utc),
+            time_zone=bratislava,
+        )
+
+        self.assertEqual(
+            [item["datetime"] for item in daily],
+            [
+                "2026-08-21T10:00:00Z",
+                "2026-08-22T10:00:00Z",
+                "2026-08-23T10:00:00Z",
+            ],
+        )
+
+    def test_rows_as_daily_forecast_rejects_large_trailing_gap(self):
+        day = datetime(2026, 8, 21, tzinfo=timezone.utc)
+        rows = forecast.parse_helper_forecast(
+            {
+                "model_run_time": day.isoformat(),
+                "source_url": "https://example.test/aladin.json",
+                "source_run_id": "run",
+                "rows": [
+                    {
+                        "valid_time": (day + timedelta(hours=hour)).isoformat(),
+                        "temperature": 10 + hour,
+                    }
+                    for hour in range(12)
+                ],
+            }
+        )
+
+        self.assertEqual(forecast.rows_as_daily_forecast(rows), [])
+
     def test_rows_as_daily_forecast_rejects_current_day_with_history_gap(self):
         day = datetime(2026, 7, 19, tzinfo=timezone.utc)
         rows = forecast.parse_helper_forecast(

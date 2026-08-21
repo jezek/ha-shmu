@@ -476,7 +476,12 @@ class TestCoordinatorForecastLifecycle(unittest.IsolatedAsyncioTestCase):
     async def test_history_gap_uses_native_aladin_leading_day_fallback(self):
         coordinator_module = _load_coordinator_module()
         coordinator = object.__new__(coordinator_module.SHMUDataUpdateCoordinator)
-        first = __import__("datetime").datetime(2026, 8, 5, 12, tzinfo=__import__("datetime").timezone.utc)
+        dt = __import__("datetime")
+        first = dt.datetime.now(dt.timezone.utc).replace(
+            hour=12, minute=0, second=0, microsecond=0
+        )
+        coordinator_module.datetime = Mock(wraps=dt.datetime)
+        coordinator_module.datetime.now.return_value = first.replace(hour=18)
         coordinator.forecast_rows = [types.SimpleNamespace(valid_time=first)]
         coordinator.forecast_historical_temperatures = {}
         coordinator.forecast_history_info = {}
@@ -506,7 +511,12 @@ class TestCoordinatorForecastLifecycle(unittest.IsolatedAsyncioTestCase):
     async def test_history_gap_does_not_use_aladin_fallback_for_helper_source(self):
         coordinator_module = _load_coordinator_module()
         coordinator = object.__new__(coordinator_module.SHMUDataUpdateCoordinator)
-        first = __import__("datetime").datetime(2026, 8, 5, 12, tzinfo=__import__("datetime").timezone.utc)
+        dt = __import__("datetime")
+        first = dt.datetime.now(dt.timezone.utc).replace(
+            hour=12, minute=0, second=0, microsecond=0
+        )
+        coordinator_module.datetime = Mock(wraps=dt.datetime)
+        coordinator_module.datetime.now.return_value = first.replace(hour=18)
         coordinator.forecast_rows = [types.SimpleNamespace(valid_time=first)]
         coordinator.forecast_historical_temperatures = {}
         coordinator.forecast_history_info = {}
@@ -526,6 +536,33 @@ class TestCoordinatorForecastLifecycle(unittest.IsolatedAsyncioTestCase):
 
         coordinator._hass.async_add_executor_job.assert_not_awaited()
         self.assertEqual(coordinator.forecast_historical_temperatures, {})
+
+    async def test_past_leading_local_day_skips_irrelevant_fallback(self):
+        coordinator_module = _load_coordinator_module()
+        dt = __import__("datetime")
+        coordinator_module.datetime = Mock(wraps=dt.datetime)
+        coordinator_module.datetime.now.return_value = dt.datetime(
+            2026, 8, 21, 1, 30, tzinfo=dt.timezone.utc
+        )
+        coordinator = object.__new__(coordinator_module.SHMUDataUpdateCoordinator)
+        first = dt.datetime(2026, 8, 20, 18, tzinfo=dt.timezone.utc)
+        coordinator.forecast_rows = [types.SimpleNamespace(valid_time=first)]
+        coordinator.forecast_historical_temperatures = {first: 99.0}
+        coordinator.forecast_history_info = {"source": "stale"}
+        coordinator._api = types.SimpleNamespace(
+            fetch_temperature_history=AsyncMock()
+        )
+        coordinator._hass = types.SimpleNamespace(
+            config=types.SimpleNamespace(time_zone="Europe/Bratislava"),
+            async_add_executor_job=AsyncMock(),
+        )
+
+        await coordinator._async_refresh_forecast_history()
+
+        self.assertEqual(coordinator.forecast_historical_temperatures, {})
+        self.assertEqual(coordinator.forecast_history_info, {})
+        coordinator._api.fetch_temperature_history.assert_not_awaited()
+        coordinator._hass.async_add_executor_job.assert_not_awaited()
 
     def test_synthetic_leading_hours_ignore_temperatures_from_other_days(self):
         coordinator_module = _load_coordinator_module()

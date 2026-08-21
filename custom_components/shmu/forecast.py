@@ -254,6 +254,7 @@ def rows_as_daily_forecast(
 
     forecasts: list[dict[str, Any]] = []
     initial_day = min(days, default=None)
+    final_day = max(days, default=None)
     reference_day = (
         _as_aware_utc(reference_time).astimezone(presentation_time_zone).date()
         if reference_time is not None
@@ -279,7 +280,16 @@ def rows_as_daily_forecast(
                     SPARSE_FORECAST_MAX_BOUNDARY_GAP.total_seconds() / 3600
                 )
             )
-            if missing_hours and not has_short_current_leading_gap:
+            last_covered_hour = max(covered_hours, default=-1)
+            has_short_trailing_horizon_gap = (
+                day_key == final_day
+                and missing_hours == set(range(last_covered_hour + 1, 24))
+                and 24 - (last_covered_hour + 1)
+                <= int(SPARSE_FORECAST_MAX_BOUNDARY_GAP.total_seconds() / 3600)
+            )
+            if missing_hours and not (
+                has_short_current_leading_gap or has_short_trailing_horizon_gap
+            ):
                 continue
         else:
             # ECMWF publishes values every three or six hours and its first

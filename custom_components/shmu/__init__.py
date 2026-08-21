@@ -224,6 +224,14 @@ class SHMUDataUpdateCoordinator(DataUpdateCoordinator):
         now = datetime.now(timezone.utc)
         if first_valid_time > now:
             return
+        local_zone = ZoneInfo(getattr(self._hass.config, "time_zone", "UTC"))
+        if first_valid_time.astimezone(local_zone).date() < now.astimezone(
+            local_zone
+        ).date():
+            # The leading local day is already in the past. It cannot appear
+            # in HA's current forecast, so completing it only wastes a
+            # preceding-run download and emits a misleading warning.
+            return
         day_start = first_valid_time.replace(hour=0, minute=0, second=0, microsecond=0)
         if self._api is not None:
             session = async_get_clientsession(self._hass)
